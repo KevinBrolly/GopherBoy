@@ -29,7 +29,7 @@ func main() {
     //gameboy.LoadROM("gb-test-roms-master/cpu_instrs/individual/04-op r,imm.gb")
     //gameboy.LoadROM("gb-test-roms-master/cpu_instrs/individual/05-op rp.gb")
     //gameboy.LoadROM("gb-test-roms-master/cpu_instrs/individual/06-ld r,r.gb")
-    gameboy.LoadROM("gb-test-roms-master/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb")
+    //gameboy.LoadROM("roms/gb-test-roms-master/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb")
     //gameboy.LoadROM("gb-test-roms-master/cpu_instrs/individual/08-misc instrs.gb")
     //gameboy.LoadROM("gb-test-roms-master/cpu_instrs/individual/09-op r,r.gb")
     //gameboy.LoadROM("gb-test-roms-master/cpu_instrs/individual/10-bit ops.gb")

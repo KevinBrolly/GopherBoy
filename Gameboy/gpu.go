@@ -97,7 +97,7 @@ func (gpu *GPU) SetSTATMode(mode byte) {
 }
 
 
-//  func (gpu *GPU) Step(cycles uint) {
+//  func (gpu *GPU) Step(cycles byte) {
 //     gpu.SetLCDStatus()
 
 //     if gpu.isLCDCEnabled() {
@@ -171,9 +171,9 @@ func (gpu *GPU) SetSTATMode(mode byte) {
 //    }
 // }
 
-func (gpu *GPU) Step(cycles uint) {
+func (gpu *GPU) Step(cycles byte) {
     if gpu.isLCDCEnabled() {
-        gpu.Cycles += cycles
+        gpu.Cycles += uint(cycles)
 
         // STAT indicates the current status of the LCD controller.
         switch gpu.GetSTATMode() {

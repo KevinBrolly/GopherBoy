@@ -40,8 +40,8 @@ func (gameboy *Gameboy) Run() {
     running := true
 
     for running {
-        gameboy.CPU.Step()
-        gameboy.GPU.Step(gameboy.CPU.Cycles)
+        cycles := gameboy.CPU.Step()
+        gameboy.GPU.Step(cycles)
 
         for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
             switch event.(type) {

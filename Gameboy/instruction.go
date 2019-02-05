@@ -1,9 +1,5 @@
 package Gameboy
 
-import (
-    "log"
-)
-
 type Instruction struct {
     Opcode byte
     Description string
@@ -388,8 +384,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
         return cpu.LD_HL_r(&cpu.Registers.L)
     }},
     0x76: &Instruction{0x76, "HALT", 1, func(cpu *CPU) byte {
-        log.Panicf("HALT NOT IMPLEMENTED")
-        return 0
+        return cpu.HALT()
     }},
     0x77: &Instruction{0x77, "LD (HL), A", 1, func(cpu *CPU) byte {
         return cpu.LD_HL_r(&cpu.Registers.A)
@@ -2253,7 +2248,7 @@ func (cpu *CPU) RET_cc(conditionCode int) (cycles byte) {
 
 // RST t | 4 | ---- | (SP-1)=PCH (SP-2)=PCL SP=SP-2 PCH=0 PCL=t
 func (cpu *CPU) RST(t byte) (cycles byte) {
-    cpu.pushWordToStack(cpu.PC)
+    cpu.pushWordToStack(cpu.PC + 1)
     cpu.PC = uint16(t)
     return 4
 }
@@ -2271,12 +2266,6 @@ func (cpu *CPU) CPL() (cycles byte) {
     return 1
 }
 
-
-// NOP | 1 | ---- | No operation
-func (cpu *CPU) NOP() (cycles byte) {
-    cpu.PC += cpu.CurrentInstruction.Length
-    return 1
-}
 
 // CCF | 1 | ---- | CY=~CY
 func (cpu *CPU) CCF() (cycles byte) {
@@ -2301,13 +2290,25 @@ func (cpu *CPU) SCF() (cycles byte) {
     return 1
 }
 
-// DI | 1 | ---- | IME=0
+// NOP | 1 | ---- | No operation
+func (cpu *CPU) NOP() (cycles byte) {
+    cpu.PC += cpu.CurrentInstruction.Length
+    return 1
+}
+
+// NOP | 1 | ---- | Halt until interrupt occurs
+func (cpu *CPU) HALT() (cycles byte) {
+    cpu.Halt = true
+    return 1
+}
+
+// DI | 1 | ---- | Disable interrupts, IME=0
 func (cpu *CPU) DI() (cycles byte) {
     cpu.IME = false
     return 1
 }
 
-// EI | 1 | ---- | IME=1
+// EI | 1 | ---- | Enable interrupts, IME=1
 func (cpu *CPU) EI() (cycles byte) {
     cpu.IME = true
     return 1

@@ -166,6 +166,11 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
 
         // I/O control handling
         case addr == IF:
+            if gameboy.CPU.Halt {
+                if value != gameboy.CPU.IF {
+                    gameboy.CPU.Halt = false
+                }
+            }
             gameboy.CPU.IF = value
         case addr == IE:
             gameboy.CPU.IE = value

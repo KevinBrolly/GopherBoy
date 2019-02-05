@@ -3,6 +3,7 @@ package Gameboy
 import (
     "os"
     "log"
+    "fmt"
 )
 
 type Registers struct {
@@ -34,6 +35,8 @@ type CPU struct {
 
     DividerCounter int
     TimerCounter int
+
+    Halt bool
 }
 
 func NewCPU(gameboy *Gameboy) *CPU {
@@ -96,19 +99,26 @@ func UnimplementedInstruction(cpu *CPU) {
 }
 
 func (cpu *CPU) Step() (cycles byte) {
-    initialPC := cpu.PC
+    if !cpu.Halt {
+        initialPC := cpu.PC
 
-    var opcode byte = cpu.GetOpcode()
+        var opcode byte = cpu.GetOpcode()
 
-    instruction := cpu.getInstruction(opcode)
-    cpu.CurrentInstruction = instruction
+        instruction := cpu.getInstruction(opcode)
+        cpu.CurrentInstruction = instruction
 
-    //fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %v, IF: %v, LCDC: %#x, STAT: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n", cpu.GetOpcode(), cpu.CurrentInstruction.Description, cpu.gameboy.GPU.LY, cpu.PC, cpu.SP, cpu.IME, cpu.IE, cpu.IF, cpu.gameboy.GPU.LCDC, cpu.gameboy.GPU.STAT, JoinBytes(cpu.Registers.A, cpu.Registers.F), JoinBytes(cpu.Registers.B, cpu.Registers.C), JoinBytes(cpu.Registers.D, cpu.Registers.E), JoinBytes(cpu.Registers.H, cpu.Registers.L))
+        //fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %v, IF: %v, LCDC: %#x, STAT: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n", cpu.GetOpcode(), cpu.CurrentInstruction.Description, cpu.gameboy.GPU.LY, cpu.PC, cpu.SP, cpu.IME, cpu.IE, cpu.IF, cpu.gameboy.GPU.LCDC, cpu.gameboy.GPU.STAT, JoinBytes(cpu.Registers.A, cpu.Registers.F), JoinBytes(cpu.Registers.B, cpu.Registers.C), JoinBytes(cpu.Registers.D, cpu.Registers.E), JoinBytes(cpu.Registers.H, cpu.Registers.L))
 
-    cycles = instruction.Execute(cpu)
+        cycles = instruction.Execute(cpu)
 
-    if initialPC == cpu.PC {
-        cpu.PC += cpu.CurrentInstruction.Length
+        if initialPC == cpu.PC {
+            cpu.PC += cpu.CurrentInstruction.Length
+        }
+
+        cpu.updateTimer(cycles)
+    } else {
+        // Halt takes 1 cycle
+        cycles = 1
     }
 
     cpu.updateTimer(cycles)

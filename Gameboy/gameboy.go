@@ -93,6 +93,16 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
         case addr == DMG_STATUS_REGISTER:
             return gameboy.dmgStatusRegister
 
+        // Timer
+        case addr == DIV:
+            return gameboy.CPU.DIV
+        case addr == TIMA:
+            return gameboy.CPU.TIMA
+        case addr == TMA:
+            return gameboy.CPU.TMA
+        case addr == TAC:
+            return gameboy.CPU.TAC
+
         // I/O control handling
         case addr == IF:
             return gameboy.CPU.IF
@@ -143,6 +153,16 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
         // Registers
         case addr == DMG_STATUS_REGISTER:
             gameboy.dmgStatusRegister = value
+
+        // Timer
+        case addr == DIV:
+            gameboy.CPU.DIV = 0
+        case addr == TIMA: // Timer Counter
+            gameboy.CPU.TIMA = value
+        case addr == TMA: // Timer Modulo
+            gameboy.CPU.TMA = value
+        case addr == TAC:
+            gameboy.CPU.TAC = value
 
         // I/O control handling
         case addr == IF:

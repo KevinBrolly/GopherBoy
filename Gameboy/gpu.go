@@ -2,6 +2,7 @@ package Gameboy
 
 import (
     "github.com/veandco/go-sdl2/sdl"
+    "GoBoy/display"
 )
 
 const (
@@ -37,18 +38,10 @@ const (
 type GPU struct {
     gameboy *Gameboy
 
-    window *sdl.Window
-    surface *sdl.Surface
-    texture *sdl.Texture
-    renderer *sdl.Renderer
-
-    framebuffer []uint32
+    window *display.Window
 
     VRAM [16384]byte
     OAM []byte
-
-    FIFO [16]byte
-    LCD []uint32
 
     LCDC byte // LCD Control
     STAT byte // LCD Status/Mode
@@ -64,16 +57,14 @@ type GPU struct {
     WX byte // Window X
 
     Cycles uint // Number of cycles since the last LCD Status Mode Change
-
-    tileset [384][8][2]byte
-
-    vblanks int
 }
 
 func NewGPU(gameboy *Gameboy) *GPU {
+    window := display.NewWindow("Gameboy", WIDTH, HEIGHT)
+
     gpu := &GPU{
         gameboy: gameboy,
-        framebuffer: make([]uint32, WIDTH*HEIGHT),
+        window: window,
         LCDC: 0x91,
         SCY: 0x00,
         SCX: 0x00,
@@ -191,7 +182,7 @@ func (gpu *GPU) Step(cycles byte) {
                     if gpu.LY == 144 {
                         // Request VBLANK interrupt
                         gpu.gameboy.requestInterrupt(VBLANK_INTERRUPT)
-                        gpu.UpdateScreen()
+                        gpu.window.Update()
 
                         // Enter GPU Mode 1/VBlank
                         gpu.SetSTATMode(MODE1)
@@ -322,7 +313,7 @@ func (gpu *GPU) renderTiles() {
         if IsBitSet(data2, byte(pixelBit)) {
             SetBit(colorIdentifier, 0)
         }
-        gpu.framebuffer[int(pixelX)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
+        gpu.window.Framebuffer[int(pixelX)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
     }
 }
 
@@ -360,7 +351,7 @@ func (gpu *GPU) renderSprites() {
                     SetBit(colorIdentifier, 0)
                 }
 
-                gpu.framebuffer[int(xPos)+int(yPos)] = gpu.getSpritePalette(colorIdentifier, attributes)
+                gpu.window.Framebuffer[int(xPos)+int(yPos)] = gpu.getSpritePalette(colorIdentifier, attributes)
             }
         }
     }
@@ -508,29 +499,4 @@ func (gpu *GPU) getSpritePalette(colorIdentifier byte, attributes byte) uint32 {
             return sdl.MapRGB(pixelFormat, 0, 0, 0)
     }
     return 0
-}
-
-
-func (gpu *GPU) UpdateScreen() {
-    gpu.texture.UpdateRGBA(nil, gpu.framebuffer, WIDTH)
-    gpu.renderer.Clear()
-    gpu.renderer.Copy(gpu.texture, nil, nil)
-    gpu.renderer.Present()
-}
-
-func (gpu *GPU) CreateWindow() {
-    if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
-        panic(err)
-    }
-
-    var err error
-    gpu.window, err = sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-        WIDTH, HEIGHT, sdl.WINDOW_SHOWN)
-    if err != nil {
-        panic(err)
-    }
-
-    gpu.renderer, _ = sdl.CreateRenderer(gpu.window, -1, sdl.RENDERER_ACCELERATED);
-
-    gpu.texture, _  = gpu.renderer.CreateTexture(uint32(sdl.PIXELFORMAT_RGBA32), sdl.TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
 }

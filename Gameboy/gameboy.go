@@ -36,7 +36,6 @@ func NewGameboy() (gameboy *Gameboy) {
 }
 
 func (gameboy *Gameboy) Run() {
-    gameboy.GPU.CreateWindow()
     running := true
 
     for running {

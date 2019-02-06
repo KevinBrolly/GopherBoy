@@ -3,7 +3,7 @@ package Gameboy
 import (
     "os"
     "log"
-    "fmt"
+    //"fmt"
 )
 
 type Registers struct {

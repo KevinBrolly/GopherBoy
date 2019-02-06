@@ -147,7 +147,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
         return cpu.LD_r_n(&cpu.Registers.H)
     }},
     0x27: &Instruction{0x27, "DAA", 1, func(cpu *CPU) byte {
-        return 0 //log.Panicf("DAA NOT IMPLEMENTED")
+        return cpu.DAA()
     }},
     0x28: &Instruction{0x30, "JR Z,r8", 2, func(cpu *CPU) byte {
         return cpu.JR_cc_e(CC_Z)
@@ -2257,6 +2257,47 @@ func (cpu *CPU) RST(t byte) (cycles byte) {
 
 // General-Purpose Arithmetic Operations and CPU Control Instructions
 
+
+// DAA | 4 | z-0x | Decimal Adjust acc
+func (cpu *CPU) DAA() (cycles byte) {
+    a := int(cpu.Registers.A)
+
+    if cpu.IsFlagSet(N) == false {
+        if cpu.IsFlagSet(H) || a & 0x0F > 9 {
+            a += 0x06
+        }
+
+        if cpu.IsFlagSet(CY) || a > 0x9F {
+            a += 0x60
+        }
+    } else {
+        if cpu.IsFlagSet(H) {
+            a = (a - 6) & 0xFF
+        }
+
+        if cpu.IsFlagSet(CY) {
+            a -= 0x60
+        }
+    }
+
+    cpu.ResetFlag(H)
+
+    if a&0x100 == 0x100 {
+        cpu.SetFlag(CY)
+    }
+
+    a &= 0xFF
+
+    if a == 0 {
+        cpu.SetFlag(Z)
+    } else {
+        cpu.ResetFlag(Z)
+    }
+
+    cpu.Registers.A = byte(a)
+
+    return 4
+}
 
 // CPL | 1 | -11- | A=^A
 func (cpu *CPU) CPL() (cycles byte) {

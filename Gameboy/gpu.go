@@ -297,9 +297,7 @@ func (gpu *GPU) renderTiles() {
         tileDataAddress := gpu.getTileDataAddress(tileIdentifier)
 
         data1, data2 := gpu.getTileData(tileDataAddress, pixelY)
-        //if tileIdentifier > 0 {
-        //    fmt.Printf("tileIdentifier: %v, data1: %v, data2: %v, tileDataAddress: %#x\n", tileIdentifier, data1, data2, tileDataAddress)
-        //}
+
         // pixel 0 in the tile is it 7 of data 1 and data2.
         // Pixel 1 is bit 6 etc..
         pixelBit := int(pixelX % 8)
@@ -313,7 +311,7 @@ func (gpu *GPU) renderTiles() {
         if IsBitSet(data2, byte(pixelBit)) {
             SetBit(colorIdentifier, 0)
         }
-        gpu.window.Framebuffer[int(pixelX)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
+        gpu.window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
     }
 }
 

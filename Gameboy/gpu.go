@@ -231,11 +231,12 @@ func (gpu *GPU) renderTiles() {
 
         var colorIdentifier byte
         if IsBitSet(data1, byte(pixelBit)) {
-            colorIdentifier = 0x02
+            colorIdentifier = SetBit(colorIdentifier, 1)
         }
         if IsBitSet(data2, byte(pixelBit)) {
-            SetBit(colorIdentifier, 0)
+            colorIdentifier = SetBit(colorIdentifier, 0)
         }
+
         gpu.window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
     }
 }

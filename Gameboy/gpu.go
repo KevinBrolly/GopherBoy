@@ -60,7 +60,7 @@ type GPU struct {
 }
 
 func NewGPU(gameboy *Gameboy) *GPU {
-    window := display.NewWindow("Gameboy", WIDTH, HEIGHT)
+    window := display.NewWindow("Gameboy", WIDTH, HEIGHT, gameboy.Quit)
 
     gpu := &GPU{
         gameboy: gameboy,
@@ -87,91 +87,16 @@ func (gpu *GPU) SetSTATMode(mode byte) {
     gpu.STAT = (gpu.STAT & 0xFC) | mode
 }
 
-
-//  func (gpu *GPU) Step(cycles byte) {
-//     gpu.SetLCDStatus()
-
-//     if gpu.isLCDCEnabled() {
-//         gpu.Cycles -= (int(cycles) * 4)
-//     } else {
-//         return
-//     }
-
-//         if gpu.Cycles <= 0 {
-//             gpu.LY = gpu.LY + 1
-
-//              gpu.Cycles = 456 ;
-
-//              // we have entered vertical blank period
-//              if (gpu.LY == 144) {
-//                 gpu.gameboy.requestInterrupt(VBLANK_INTERRUPT)
-//             } else if (gpu.LY > 153) {
-//                gpu.LY = 0
-//             } else if (gpu.LY < 144) {
-//                gpu.renderScanline()
-//             }
-//         }
-
-// }
-
-// func (gpu *GPU) SetLCDStatus() {
-//     if (false == gpu.isLCDCEnabled()) {
-//      // set the mode to 1 during lcd disabled and reset scanline
-//      gpu.Cycles = 456
-//      gpu.LY = 0
-//      gpu.SetSTATMode(MODE1)
-
-//      return
-//    }
-//     // in vblank so set mode to 1
-//     if (gpu.LY >= 144) {
-//         gpu.SetSTATMode(MODE1)
-//         if IsBitSet(gpu.STAT, MODE1_INTERRUPT){
-//             gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
-//         }
-//    } else {
-//      var mode2bounds int = 456-80
-//      var mode3bounds int = mode2bounds - 172
-
-//      // mode 2
-//      if (gpu.Cycles >= mode2bounds) {
-//         gpu.SetSTATMode(MODE2)
-//         if IsBitSet(gpu.STAT, MODE2_INTERRUPT){
-//             gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
-//         }
-//      } else if(gpu.Cycles >= mode3bounds) {
-//        gpu.SetSTATMode(MODE3)
-//      } else {
-//         gpu.SetSTATMode(MODE0)
-//         if IsBitSet(gpu.STAT, MODE0_INTERRUPT){
-//             gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
-//         }
-//      }
-//    }
-
-//    gpu.STAT = SetBit(gpu.STAT, MATCH_FLAG)
-
-//    // check the conincidence flag
-//    if (gpu.LY == gpu.LYC) {
-//         gpu.STAT = SetBit(gpu.STAT, MATCH_FLAG)
-//         if IsBitSet(gpu.STAT, MATCH_INTERRUPT) {
-//             gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
-//         }
-//    } else {
-//      gpu.STAT = ClearBit(gpu.STAT, MATCH_FLAG)
-//    }
-// }
-
 func (gpu *GPU) Step(cycles byte) {
     if gpu.isLCDCEnabled() {
-        gpu.Cycles += uint(cycles)
+        gpu.Cycles += uint(cycles*4)
 
         // STAT indicates the current status of the LCD controller.
         switch gpu.GetSTATMode() {
             // HBlank
             // After the last HBlank, push the screen data to canvas
             case MODE0:
-                if gpu.Cycles >= 51 {
+                if gpu.Cycles >= 204 {
                     // Reset the cycle counter
                     gpu.Cycles = 0
 
@@ -201,7 +126,7 @@ func (gpu *GPU) Step(cycles byte) {
             // VBlank
             // After 10 lines, restart scanline and draw the next frame
             case MODE1:
-                if gpu.Cycles >= 114 {
+                if gpu.Cycles >= 4560 {
                     // Reset the cycle counter
                     gpu.Cycles = 0
 
@@ -224,7 +149,7 @@ func (gpu *GPU) Step(cycles byte) {
 
             // OAM access mode, scanline active
             case MODE2:
-                if gpu.Cycles >= 20 {
+                if gpu.Cycles >= 80 {
                     // Reset the cycle counter
                     gpu.Cycles = 0
                     // Enter GPU Mode 3
@@ -234,7 +159,7 @@ func (gpu *GPU) Step(cycles byte) {
             // VRAM access mode, scanline active
             // Treat end of mode 3 as end of scanline
             case MODE3:
-                if gpu.Cycles >= 43 {
+                if gpu.Cycles >= 172 {
                     // Reset the cycle counter
                     gpu.Cycles = 0
 
@@ -287,7 +212,7 @@ func (gpu *GPU) renderTiles() {
     tileRow := uint16(pixelY/8) * 32
 
     for pixel := byte(0); pixel < 160; pixel++ {
-        // Add pixel being drawn in scaline to scrollX to get the current pixel X position
+        // Add pixel being drawn in scanline to scrollX to get the current pixel X position
         pixelX := pixel + gpu.SCX
 
         // which of the 8 horizontal tiles does this pixel fall within?
@@ -417,7 +342,6 @@ func (gpu *GPU) getTileData(tileDataAddress uint16, pixelY byte) (byte, byte) {
     line = line * 2 // each vertical line takes up two bytes of memory
     data1 := gpu.gameboy.ReadByte(tileDataAddress + uint16(line))
     data2 := gpu.gameboy.ReadByte(tileDataAddress + uint16(line) + 1)
-    //fmt.Printf("DATA1 ADDR: %#x, DATA2 ADDR: %#x\n", tileDataAddress + uint16(line), tileDataAddress + uint16(line) + 1)
 
     return data1, data2
 }

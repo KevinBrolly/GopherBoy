@@ -4,7 +4,6 @@ import (
     "os"
     "log"
     "fmt"
-    "github.com/veandco/go-sdl2/sdl"
 )
 
 type Gameboy struct {
@@ -20,6 +19,7 @@ type Gameboy struct {
 
     P1 byte
     debug byte
+    running bool
 }
 
 func NewGameboy() (gameboy *Gameboy) {
@@ -36,21 +36,16 @@ func NewGameboy() (gameboy *Gameboy) {
 }
 
 func (gameboy *Gameboy) Run() {
-    running := true
+    gameboy.running = true
 
-    for running {
+    for gameboy.running {
         cycles := gameboy.CPU.Step()
         gameboy.GPU.Step(cycles)
-
-        for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-            switch event.(type) {
-            case *sdl.QuitEvent:
-                println("Quit")
-                running = false
-                break
-            }
-        }
     }
+}
+
+func (gameboy *Gameboy) Quit() {
+    gameboy.running = false
 }
 
 func (gameboy *Gameboy) LoadROM(filename string) {
@@ -173,9 +168,6 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
             gameboy.CPU.IF = value
         case addr == IE:
             gameboy.CPU.IE = value
-
-        case addr == P1:
-            gameboy.P1 = value & 0x30
 
         case addr == LCDC:
             gameboy.GPU.LCDC = value

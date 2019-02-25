@@ -1696,18 +1696,18 @@ func (cpu *CPU) PUSH_qq(r1 *byte, r2 *byte) (cycles byte) {
     return 4
 }
 
-// POP qq | 4 | ---- | qqL=(SP) qqH=(SP+1) SP=SP+2
+// POP qq | 3 | ---- | qqL=(SP) qqH=(SP+1) SP=SP+2
 func (cpu *CPU) POP_qq(r1 *byte, r2 *byte) (cycles byte) {
     *r1, *r2 = SplitBytes(cpu.popWordFromStack())
-    return 4
+    return 3
 }
 
-// POP AF | 4 | **** | qqL=(SP) qqH=(SP+1) SP=SP+2
+// POP AF | 3 | **** | qqL=(SP) qqH=(SP+1) SP=SP+2
 func (cpu *CPU) POP_AF() (cycles byte) {
     cpu.Registers.A, cpu.Registers.F = SplitBytes(cpu.popWordFromStack())
     // Since F only holds 4 bits/flags, we mask to ensure only bits 4-7 are set
     cpu.Registers.F &= 0xF0
-    return 4
+    return 3
 }
 
 // LDHL SP,e | 3 | **00 | HL=SP+e
@@ -2258,7 +2258,7 @@ func (cpu *CPU) RST(t byte) (cycles byte) {
 // General-Purpose Arithmetic Operations and CPU Control Instructions
 
 
-// DAA | 4 | z-0x | Decimal Adjust acc
+// DAA | 1 | z-0x | Decimal Adjust acc
 func (cpu *CPU) DAA() (cycles byte) {
     a := int(cpu.Registers.A)
 
@@ -2296,7 +2296,7 @@ func (cpu *CPU) DAA() (cycles byte) {
 
     cpu.Registers.A = byte(a)
 
-    return 4
+    return 1
 }
 
 // CPL | 1 | -11- | A=^A

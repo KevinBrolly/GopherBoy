@@ -199,12 +199,21 @@ func (gpu *GPU) isLCDCEnabled() bool {
 
 
 func (gpu *GPU) renderTiles() {
-    BGCodeAreaSelection := gpu.getBGCodeAreaSelection()
+    windowEnabled := false
+    if(IsBitSet(gpu.LCDC, WINDOWING_ON_FLAG)) {
+        if gpu.WY <= gpu.LY {
+            windowEnabled = true
+        }
+    }
 
-    // We need the address of the tile in the background map
+    tileDataAreaSelection := gpu.getBGCodeAreaSelection()
+    pixelY := gpu.LY + gpu.SCY
 
-    // Add ScrollY to the Scanline to get the current pixel Y position
-    pixelY := gpu.SCY + gpu.LY
+    if windowEnabled {
+        tileDataAreaSelection = gpu.getWindowCodeAreaSelection()
+        // Add ScrollY to the Scanline to get the current pixel Y position
+        pixelY = gpu.LY - gpu.WY
+    }
 
     // Divide the pixel being drawn Y position by 8 (for 8 pixels in tile)
     // and multiply by 32 (for number of tiles in the background map)
@@ -215,10 +224,17 @@ func (gpu *GPU) renderTiles() {
         // Add pixel being drawn in scanline to scrollX to get the current pixel X position
         pixelX := pixel + gpu.SCX
 
+        // translate the current x pos to window space if necessary
+        if windowEnabled {
+            if pixel >= gpu.WX {
+               pixelX = pixel - gpu.WX
+            }
+         }
+
         // which of the 8 horizontal tiles does this pixel fall within?
         tileCol := uint16(pixelX / 8)
 
-        tileIdentifier := gpu.gameboy.ReadByte(BGCodeAreaSelection + tileRow + tileCol)
+        tileIdentifier := gpu.gameboy.ReadByte(tileDataAreaSelection + tileRow + tileCol)
         tileDataAddress := gpu.getTileDataAddress(tileIdentifier)
 
         data1, data2 := gpu.getTileData(tileDataAddress, pixelY)
@@ -250,12 +266,12 @@ func (gpu *GPU) renderSprites() {
         characterCode := gpu.gameboy.ReadByte(uint16(0xFE00 + index + 2))
         attributes := gpu.gameboy.ReadByte(uint16(0xFE00 + index + 3))
 
-        //yFlip := IsBitSet(attributes, 6)
+        yFlip := IsBitSet(attributes, 6)
         xFlip := IsBitSet(attributes, 5)
 
         if ((gpu.LY >= yPos) && (gpu.LY < (yPos+8))) {
 
-            data1, data2 := gpu.getObjData(characterCode, yPos)
+            data1, data2 := gpu.getObjData(characterCode, yPos, yFlip)
 
             // its easier to read in from right to left as pixel 0 is
             // bit 7 in the colour data, pixel 1 is bit 6 etc...
@@ -269,10 +285,10 @@ func (gpu *GPU) renderSprites() {
 
                 var colorIdentifier byte
                 if IsBitSet(data1, byte(pixelBit)) {
-                    colorIdentifier = 0x02
+                    colorIdentifier = SetBit(colorIdentifier, 1)
                 }
                 if IsBitSet(data2, byte(pixelBit)) {
-                    SetBit(colorIdentifier, 0)
+                    colorIdentifier = SetBit(colorIdentifier, 0)
                 }
 
                 gpu.window.Framebuffer[int(xPos)+int(yPos)] = gpu.getSpritePalette(colorIdentifier, attributes)
@@ -347,12 +363,13 @@ func (gpu *GPU) getTileData(tileDataAddress uint16, pixelY byte) (byte, byte) {
     return data1, data2
 }
 
-func (gpu *GPU) getObjData(characterCode byte, yPos byte) (byte, byte) {
-    line := gpu.LY - yPos
-    line *= 2; // same as for tiles
+func (gpu *GPU) getObjData(characterCode byte, yPos byte, yFlip bool) (byte, byte) {
+    line := uint16(gpu.LY - yPos)
+
+    line *= 2 // same as for tiles
 
     var objCharacterDataStorage uint16 = 0x8000
-    objDataAddress := objCharacterDataStorage + (uint16(characterCode) * 16) + uint16(line) // 16 = obj size in bytes
+    objDataAddress := objCharacterDataStorage + (uint16(characterCode) * 16) + line // 16 = obj size in bytes
 
     data1 := gpu.gameboy.ReadByte(objDataAddress)
     data2 := gpu.gameboy.ReadByte(objDataAddress + 1)
@@ -413,7 +430,7 @@ func (gpu *GPU) getSpritePalette(colorIdentifier byte, attributes byte) uint32 {
 
     switch (color) {
         case 0:
-            return sdl.MapRGB(pixelFormat, 255, 255, 255)
+            return sdl.MapRGBA(pixelFormat, 255, 255, 255, 0)
         case 1:
             return sdl.MapRGB(pixelFormat, 192, 192, 192)
         case 2:

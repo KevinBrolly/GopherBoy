@@ -38,7 +38,7 @@ func NewWindow(name string, width, height int, quitFunc func()) *Window {
         panic(err)
     }
 
-    w.renderer, _ = sdl.CreateRenderer(w.window, -1, sdl.RENDERER_TARGETTEXTURE)
+    w.renderer, _ = sdl.CreateRenderer(w.window, -1, sdl.RENDERER_SOFTWARE)
 
     w.texture, _  = w.renderer.CreateTexture(uint32(sdl.PIXELFORMAT_RGBA32), sdl.TEXTUREACCESS_TARGET, int32(w.Width), int32(w.Height))
 
@@ -49,6 +49,7 @@ func (w *Window) Quit() {
     w.texture.Destroy()
     w.renderer.Destroy()
     w.window.Destroy()
+    sdl.Quit()
 }
 
 func (w *Window) Update() {

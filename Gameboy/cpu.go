@@ -64,6 +64,8 @@ func (cpu *CPU) Reset() {
 
     cpu.IE = 0x00
     cpu.IF = 0xE1
+
+    cpu.TimerCounter = 1024
 }
 
 func (cpu *CPU) GetOpcode() byte {
@@ -114,8 +116,6 @@ func (cpu *CPU) Step() (cycles byte) {
         if initialPC == cpu.PC {
             cpu.PC += cpu.CurrentInstruction.Length
         }
-
-        cpu.updateTimer(cycles)
     } else {
         // Halt takes 1 cycle
         cycles = 1
@@ -173,19 +173,6 @@ func (cpu *CPU) updateDividerRegister(cycles byte) {
 
 func (cpu *CPU) getClockFrequency() byte {
     return cpu.TAC & 0x03
-}
-
-func (cpu *CPU) setTACFrequency(frequency byte) {
-    switch (frequency) {
-        case 0:
-            cpu.TimerCounter = 1024  // frequency 4096
-                case 1:
-                    cpu.TimerCounter = 16    // frequency 262144
-                case 2:
-                    cpu.TimerCounter = 64    // frequency 65536
-                case 3:
-                    cpu.TimerCounter = 256   // frequency 16382
-            }
 }
 
 func (cpu *CPU) handleInterrupts() {

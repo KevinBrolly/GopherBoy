@@ -4,6 +4,7 @@ import (
     "os"
     "log"
     "fmt"
+    "time"
 )
 
 type Gameboy struct {
@@ -36,11 +37,21 @@ func NewGameboy() (gameboy *Gameboy) {
 }
 
 func (gameboy *Gameboy) Run() {
-    gameboy.running = true
+    timePerFrame := time.Second / 60
 
-    for gameboy.running {
-        cycles := gameboy.CPU.Step()
-        gameboy.GPU.Step(cycles)
+    ticker := time.NewTicker(timePerFrame)
+
+    for range ticker.C {
+        MAXCYCLES := 17476
+        cyclesThisUpdate := 0
+
+        for (cyclesThisUpdate < MAXCYCLES) {
+            cycles := gameboy.CPU.Step()
+            gameboy.GPU.Step(cycles)
+            cyclesThisUpdate += int(cycles)
+        }
+
+        gameboy.GPU.Window.Update()
     }
 }
 
@@ -118,6 +129,10 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
             return gameboy.GPU.LY
         case addr == BGP:
             return gameboy.GPU.BGP
+        case addr == OBP0:
+            return gameboy.GPU.OBP0
+        case addr == OBP1:
+            return gameboy.GPU.OBP1
         case addr == WY:
             return gameboy.GPU.WY
         case addr == WX:
@@ -134,9 +149,6 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
 
 func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
     switch {
-        //ROM Bank 0
-        case addr >= 0x0000 && addr <= 0x7FFF:
-            gameboy.ROM[addr] = value
         //Working RAM
         case addr >= 0xC000 && addr <= 0xDFFF:
             gameboy.WorkingRAM[addr & 0x1FFF] = value
@@ -149,14 +161,30 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
             gameboy.dmgStatusRegister = value
 
         // Timer
-        case addr == DIV:
+        case addr == DIV: // Divider
             gameboy.CPU.DIV = 0
         case addr == TIMA: // Timer Counter
             gameboy.CPU.TIMA = value
         case addr == TMA: // Timer Modulo
             gameboy.CPU.TMA = value
         case addr == TAC:
+            currentfreq := gameboy.CPU.getClockFrequency()
             gameboy.CPU.TAC = value
+
+            newfreq := gameboy.CPU.getClockFrequency()
+
+            if (currentfreq != newfreq) {
+                switch (newfreq) {
+                    case 0:
+                        gameboy.CPU.TimerCounter = 1024  // frequency 4096
+                    case 1:
+                        gameboy.CPU.TimerCounter = 16    // frequency 262144
+                    case 2:
+                        gameboy.CPU.TimerCounter = 64    // frequency 65536
+                    case 3:
+                        gameboy.CPU.TimerCounter = 256   // frequency 16382
+                }
+            }
 
         // I/O control handling
         case addr == IF:
@@ -184,6 +212,10 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
             gameboy.GPU.LYC = value
         case addr == BGP:
             gameboy.GPU.BGP = value
+        case addr == OBP0:
+            gameboy.GPU.OBP0 = value
+        case addr == OBP1:
+            gameboy.GPU.OBP1 = value
         case addr == WY:
             gameboy.GPU.WY = value
         case addr == WX:

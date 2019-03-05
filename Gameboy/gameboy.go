@@ -139,6 +139,8 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
             return gameboy.GPU.WX
         case addr >= 0x8000 && addr <= 0x9FFF:
             return gameboy.GPU.VRAM[addr & 0x1FFF]
+        case addr >= 0xFE00 && addr <= 0xFE9F:
+            return gameboy.GPU.OAM[addr & 0x9F]
 
         case addr == 0xFF01:
             return gameboy.debug
@@ -210,6 +212,14 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
             gameboy.GPU.LY = 0
         case addr == LYC:
             gameboy.GPU.LYC = value
+        case addr == DMA:
+            // The value holds the source address of the OAM data divided by 100
+            // so we have to multiply it first
+            var sourceAddr uint16 = uint16(value) << 8
+
+            for i := 0; i < 160; i++ {
+                gameboy.GPU.OAM[i] = gameboy.ReadByte(sourceAddr + uint16(i))
+            }
         case addr == BGP:
             gameboy.GPU.BGP = value
         case addr == OBP0:

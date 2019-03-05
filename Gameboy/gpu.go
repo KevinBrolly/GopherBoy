@@ -3,6 +3,7 @@ package Gameboy
 import (
     "github.com/veandco/go-sdl2/sdl"
     "GoBoy/display"
+    "fmt"
 )
 
 const (
@@ -38,10 +39,10 @@ const (
 type GPU struct {
     gameboy *Gameboy
 
-    window *display.Window
+    Window *display.Window
 
     VRAM [16384]byte
-    OAM []byte
+    OAM [160]byte
 
     LCDC byte // LCD Control
     STAT byte // LCD Status/Mode
@@ -64,7 +65,7 @@ func NewGPU(gameboy *Gameboy) *GPU {
 
     gpu := &GPU{
         gameboy: gameboy,
-        window: window,
+        Window: window,
         LCDC: 0x91,
         SCY: 0x00,
         SCX: 0x00,
@@ -107,7 +108,6 @@ func (gpu *GPU) Step(cycles byte) {
                     if gpu.LY == 144 {
                         // Request VBLANK interrupt
                         gpu.gameboy.requestInterrupt(VBLANK_INTERRUPT)
-                        gpu.window.Update()
 
                         // Enter GPU Mode 1/VBlank
                         gpu.SetSTATMode(MODE1)
@@ -253,24 +253,22 @@ func (gpu *GPU) renderTiles() {
             colorIdentifier = SetBit(colorIdentifier, 0)
         }
 
-        gpu.window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
+        gpu.Window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
     }
 }
 
 func (gpu *GPU) renderSprites() {
     for sprite := 0; sprite < 40; sprite++ {
-        // sprite occupies 4 bytes in the sprite attributes table
         index := sprite*4
-        yPos := gpu.gameboy.ReadByte(uint16(0xFE00 + index)) - 16
-        xPos := gpu.gameboy.ReadByte(uint16(0xFE00 + index + 1)) - 8
-        characterCode := gpu.gameboy.ReadByte(uint16(0xFE00 + index + 2))
-        attributes := gpu.gameboy.ReadByte(uint16(0xFE00 + index + 3))
+        yPos := gpu.OAM[index] - 16
+        xPos := gpu.OAM[index+1] - 8
+        characterCode := gpu.OAM[index+2]
+        attributes := gpu.OAM[index+3]
 
         yFlip := IsBitSet(attributes, 6)
         xFlip := IsBitSet(attributes, 5)
 
         if ((gpu.LY >= yPos) && (gpu.LY < (yPos+8))) {
-
             data1, data2 := gpu.getObjData(characterCode, yPos, yFlip)
 
             // its easier to read in from right to left as pixel 0 is
@@ -291,7 +289,12 @@ func (gpu *GPU) renderSprites() {
                     colorIdentifier = SetBit(colorIdentifier, 0)
                 }
 
-                gpu.window.Framebuffer[int(xPos)+int(yPos)] = gpu.getSpritePalette(colorIdentifier, attributes)
+                var xPix int = 0 - tilePixel
+                xPix += 7
+
+                var pixel int = int(xPos)+xPix
+
+                gpu.Window.Framebuffer[pixel+(160*int(gpu.LY))] = gpu.getSpritePalette(colorIdentifier, attributes)
             }
         }
     }

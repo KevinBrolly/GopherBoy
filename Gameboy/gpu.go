@@ -2,8 +2,6 @@ package Gameboy
 
 import (
     "github.com/veandco/go-sdl2/sdl"
-    "GoBoy/display"
-    "fmt"
 )
 
 const (
@@ -39,7 +37,7 @@ const (
 type GPU struct {
     gameboy *Gameboy
 
-    Window *display.Window
+    Window *Window
 
     VRAM [16384]byte
     OAM [160]byte
@@ -61,7 +59,7 @@ type GPU struct {
 }
 
 func NewGPU(gameboy *Gameboy) *GPU {
-    window := display.NewWindow("Gameboy", WIDTH, HEIGHT, gameboy.Quit)
+    window := NewWindow("Gameboy", WIDTH, HEIGHT, gameboy.Quit)
 
     gpu := &GPU{
         gameboy: gameboy,

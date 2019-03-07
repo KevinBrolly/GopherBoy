@@ -1,4 +1,4 @@
-package display
+package Gameboy
 
 import (
     "github.com/veandco/go-sdl2/sdl"
@@ -53,14 +53,6 @@ func (w *Window) Quit() {
 }
 
 func (w *Window) Update() {
-    for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-        switch event.(type) {
-        case *sdl.QuitEvent:
-            w.Quit()
-            w.QuitFunc()
-        }
-    }
-
     w.texture.UpdateRGBA(nil, w.Framebuffer, w.Width)
     w.renderer.Clear()
     w.renderer.Copy(w.texture, nil, nil)

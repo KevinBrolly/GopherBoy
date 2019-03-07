@@ -5,11 +5,13 @@ import (
     "log"
     "fmt"
     "time"
+    "github.com/veandco/go-sdl2/sdl"
 )
 
 type Gameboy struct {
     CPU *CPU
     GPU *GPU
+    Controller *Controller
 
     inBootMode bool
     dmgStatusRegister byte
@@ -33,6 +35,7 @@ func NewGameboy() (gameboy *Gameboy) {
 
     gameboy.GPU = NewGPU(gameboy)
     gameboy.CPU = NewCPU(gameboy)
+    gameboy.Controller = NewController(gameboy)
     return
 }
 
@@ -49,6 +52,58 @@ func (gameboy *Gameboy) Run() {
             cycles := gameboy.CPU.Step()
             gameboy.GPU.Step(cycles)
             cyclesThisUpdate += int(cycles)
+        }
+
+        // Check for events
+        for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+            switch e := event.(type) {
+            case *sdl.QuitEvent:
+                gameboy.GPU.Window.Quit()
+                gameboy.Quit()
+
+            case *sdl.KeyboardEvent:
+                if e.Type == sdl.KEYDOWN {
+                    switch e.Keysym.Sym {
+                    case sdl.K_RIGHT:
+                        gameboy.Controller.KeyPressed(RIGHT)
+                    case sdl.K_LEFT:
+                        gameboy.Controller.KeyPressed(LEFT)
+                    case sdl.K_UP:
+                        gameboy.Controller.KeyPressed(UP)
+                    case sdl.K_DOWN:
+                        gameboy.Controller.KeyPressed(DOWN)
+                    case sdl.K_a:
+                        gameboy.Controller.KeyPressed(A)
+                    case sdl.K_b:
+                        gameboy.Controller.KeyPressed(B)
+                    case sdl.K_RETURN:
+                        gameboy.Controller.KeyPressed(SELECT)
+                    case sdl.K_SPACE:
+                        gameboy.Controller.KeyPressed(START)
+
+                    }
+                } else if e.Type == sdl.KEYUP {
+                    switch e.Keysym.Sym {
+                    case sdl.K_RIGHT:
+                        gameboy.Controller.KeyReleased(RIGHT)
+                    case sdl.K_LEFT:
+                        gameboy.Controller.KeyReleased(LEFT)
+                    case sdl.K_UP:
+                        gameboy.Controller.KeyReleased(UP)
+                    case sdl.K_DOWN:
+                        gameboy.Controller.KeyReleased(DOWN)
+                    case sdl.K_a:
+                        gameboy.Controller.KeyReleased(A)
+                    case sdl.K_b:
+                        gameboy.Controller.KeyReleased(B)
+                    case sdl.K_RETURN:
+                        gameboy.Controller.KeyReleased(SELECT)
+                    case sdl.K_SPACE:
+                        gameboy.Controller.KeyReleased(START)
+
+                    }
+                }
+            }
         }
 
         gameboy.GPU.Window.Update()
@@ -76,6 +131,12 @@ func (gameboy *Gameboy) WriteWord(addr uint16, value uint16) {
 }
 
 func (gameboy *Gameboy) ReadByte(addr uint16) byte {
+
+    // Check the controls
+    if value := gameboy.Controller.ReadByte(addr); value != 0 {
+        return value
+    }
+
     switch {
         //ROM Bank 0
         case addr >= 0x0000 && addr <= 0x3FFF:
@@ -114,9 +175,6 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
         case addr == IE:
             return gameboy.CPU.IE
 
-        case addr == P1:
-            return gameboy.P1 & 0x0F
-
         case addr == LCDC:
             return gameboy.GPU.LCDC
         case addr == STAT:
@@ -150,6 +208,10 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
 }
 
 func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
+
+    // Check the controls
+    gameboy.Controller.WriteByte(addr, value)
+
     switch {
         //Working RAM
         case addr >= 0xC000 && addr <= 0xDFFF:

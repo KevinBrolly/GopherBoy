@@ -1,8 +1,6 @@
 package Gameboy
 
 import (
-    "os"
-    "log"
     "fmt"
     "time"
     "github.com/veandco/go-sdl2/sdl"
@@ -11,12 +9,12 @@ import (
 type Gameboy struct {
     CPU *CPU
     GPU *GPU
+    Cartridge *Cartridge
     Controller *Controller
 
     inBootMode bool
     dmgStatusRegister byte
     bios [256]byte
-    ROM []byte
     WorkingRAM [8192]byte //0xC000 -> 0xDFFF (8KB Working RAM)
     ZeroPageRAM [128]byte //0xFF80 - 0xFFFE
 
@@ -29,13 +27,13 @@ func NewGameboy() (gameboy *Gameboy) {
     gameboy = &Gameboy{
         inBootMode: false,
         bios: BIOS,
-        ROM: make([]byte, 100000),
         P1: 0xFF,
     }
 
     gameboy.GPU = NewGPU(gameboy)
     gameboy.CPU = NewCPU(gameboy)
     gameboy.Controller = NewController(gameboy)
+    gameboy.Cartridge = NewCartridge(gameboy)
     return
 }
 
@@ -114,16 +112,6 @@ func (gameboy *Gameboy) Quit() {
     gameboy.running = false
 }
 
-func (gameboy *Gameboy) LoadROM(filename string) {
-    file, err := os.Open(filename)
-    if err != nil {
-        log.Fatal(err)
-    }
-    data := make([]byte, 50000)
-    file.Read(data)
-    copy(gameboy.ROM, data)
-}
-
 func (gameboy *Gameboy) WriteWord(addr uint16, value uint16) {
     hb, lb := SplitBytes(value)
     gameboy.WriteByte(addr, hb)
@@ -132,22 +120,17 @@ func (gameboy *Gameboy) WriteWord(addr uint16, value uint16) {
 
 func (gameboy *Gameboy) ReadByte(addr uint16) byte {
 
+    // Check the cartridge
+    if value := gameboy.Cartridge.ReadByte(addr); value != 0 {
+        return value
+    }
+
     // Check the controls
     if value := gameboy.Controller.ReadByte(addr); value != 0 {
         return value
     }
 
     switch {
-        //ROM Bank 0
-        case addr >= 0x0000 && addr <= 0x3FFF:
-            if gameboy.inBootMode && addr < 0x0100 {
-                //in bios mode, read from bios
-                return gameboy.bios[addr]
-            }
-            return gameboy.ROM[addr]
-        //ROM Bank 1
-        case addr >= 0x4000 && addr <= 0x7FFF:
-            return gameboy.ROM[addr]
         //Working RAM
         case addr >= 0xC000 && addr <= 0xDFFF:
             return gameboy.WorkingRAM[addr & 0x1FFF]
@@ -208,6 +191,9 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
 }
 
 func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
+
+    // Check the cartridge
+    gameboy.Cartridge.WriteByte(addr, value)
 
     // Check the controls
     gameboy.Controller.WriteByte(addr, value)

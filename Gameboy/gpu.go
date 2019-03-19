@@ -265,7 +265,7 @@ func (gpu *GPU) renderSprites() {
 		yFlip := IsBitSet(attributes, 6)
 		xFlip := IsBitSet(attributes, 5)
 
-		if (gpu.LY >= yPos) && (gpu.LY < (yPos + 8)) {
+		if (gpu.LY >= yPos) && (gpu.LY < (yPos + gpu.getSpriteSize())) {
 			data1, data2 := gpu.getObjData(characterCode, yPos, yFlip)
 
 			// its easier to read in from right to left as pixel 0 is
@@ -364,17 +364,32 @@ func (gpu *GPU) getTileData(tileDataAddress uint16, pixelY byte) (byte, byte) {
 }
 
 func (gpu *GPU) getObjData(characterCode byte, yPos byte, yFlip bool) (byte, byte) {
-	line := uint16(gpu.LY - yPos)
+	line := int(gpu.LY - yPos)
+
+	if yFlip {
+		line -= int(gpu.getSpriteSize())
+		line *= -1
+	}
 
 	line *= 2 // same as for tiles
 
-	var objCharacterDataStorage uint16 = 0x8000
-	objDataAddress := objCharacterDataStorage + (uint16(characterCode) * 16) + line // 16 = obj size in bytes
+	objCharacterDataStorage := 0x8000
+	objDataAddress := objCharacterDataStorage + (int(characterCode) * 16) + line // 16 = obj size in bytes
 
-	data1 := gpu.gameboy.ReadByte(objDataAddress)
-	data2 := gpu.gameboy.ReadByte(objDataAddress + 1)
+	data1 := gpu.gameboy.ReadByte(uint16(objDataAddress))
+	data2 := gpu.gameboy.ReadByte(uint16(objDataAddress + 1))
 
 	return data1, data2
+}
+
+func (gpu *GPU) getSpriteSize() byte {
+	switch IsBitSet(gpu.LCDC, OBJ_BLOCK_COMPOSITION_SELECTION_FLAG) {
+	case false:
+		return 8
+	case true:
+		return 16
+	}
+	return 0
 }
 
 func (gpu *GPU) getColorFromBGPalette(colorIdentifier byte) uint32 {

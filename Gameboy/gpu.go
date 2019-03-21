@@ -78,6 +78,74 @@ func NewGPU(gameboy *Gameboy) *GPU {
 	return gpu
 }
 
+func (gpu *GPU) ReadByte(addr uint16) byte {
+	switch {
+	case addr == LCDC:
+		return gpu.LCDC
+	case addr == STAT:
+		return gpu.STAT
+	case addr == SCY:
+		return gpu.SCY
+	case addr == SCX:
+		return gpu.SCX
+	case addr == LY:
+		return gpu.LY
+	case addr == BGP:
+		return gpu.BGP
+	case addr == OBP0:
+		return gpu.OBP0
+	case addr == OBP1:
+		return gpu.OBP1
+	case addr == WY:
+		return gpu.WY
+	case addr == WX:
+		return gpu.WX
+	case addr >= 0x8000 && addr <= 0x9FFF:
+		return gpu.VRAM[addr&0x1FFF]
+	case addr >= 0xFE00 && addr <= 0xFE9F:
+		return gpu.OAM[addr&0x9F]
+	}
+	return 0
+}
+
+func (gpu *GPU) WriteByte(addr uint16, value byte) {
+	switch {
+	case addr == LCDC:
+		gpu.LCDC = value
+	case addr == STAT:
+		gpu.STAT = (0xF8 & value) | gpu.GetSTATMode()
+	case addr == SCY:
+		gpu.SCY = value
+	case addr == SCX:
+		gpu.SCX = value
+	case addr == LY:
+		// If the game writes to scanline it should be unset
+		gpu.LY = 0
+	case addr == LYC:
+		gpu.LYC = value
+	case addr == DMA:
+		// The value holds the source address of the OAM data divided by 100
+		// so we have to multiply it first
+		var sourceAddr uint16 = uint16(value) << 8
+
+		for i := 0; i < 160; i++ {
+			gpu.OAM[i] = gpu.gameboy.ReadByte(sourceAddr + uint16(i))
+		}
+	case addr == BGP:
+		gpu.BGP = value
+	case addr == OBP0:
+		gpu.OBP0 = value
+	case addr == OBP1:
+		gpu.OBP1 = value
+	case addr == WY:
+		gpu.WY = value
+	case addr == WX:
+		gpu.WX = value
+	case addr >= 0x8000 && addr <= 0x9FFF:
+		gpu.VRAM[addr&0x1FFF] = value
+	}
+}
+
 func (gpu *GPU) GetSTATMode() byte {
 	return gpu.STAT & 0x03
 }
@@ -348,7 +416,12 @@ func (gpu *GPU) getTileDataAddress(tileIdentifier byte) uint16 {
 	// a signed byte -127 - 127, the offset corrects for this
 	// when looking up the memory location
 	BGCharacterDataSelection, offset := gpu.getBGCharacterDataSelection()
-	return BGCharacterDataSelection + ((uint16(tileIdentifier) + offset) * 16) // 16 = tile size in bytes
+	if tileIdentifier > 127 {
+		return BGCharacterDataSelection + (uint16(tileIdentifier)-offset)*16 // 16 = tile size in bytes
+	} else {
+		return BGCharacterDataSelection + (uint16(tileIdentifier)+offset)*16 // 16 = tile size in bytes
+
+	}
 }
 
 func (gpu *GPU) getTileData(tileDataAddress uint16, pixelY byte) (byte, byte) {

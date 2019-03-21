@@ -2,6 +2,7 @@ package Gameboy
 
 import (
 	"io/ioutil"
+	"log"
 )
 
 const (
@@ -37,11 +38,14 @@ func NewCartridge(gameboy *Gameboy) *Cartridge {
 }
 
 func (c *Cartridge) LoadCartridgeData(filename string) {
-	c.CartridgeData, _ = ioutil.ReadFile(filename)
+	data, err := ioutil.ReadFile(filename)
 
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	c.CartridgeData = data
 	c.SetBankMode()
-
-	//fmt.Printf("Test %#x", c.CartridgeData[uint32(0x7FF3-0x4000)+(3*0x4000)])
 }
 
 func (c *Cartridge) SetBankMode() {

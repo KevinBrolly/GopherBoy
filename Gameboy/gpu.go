@@ -9,18 +9,6 @@ const (
 	HEIGHT = 144
 )
 
-// LCD Control Register bit positions
-const (
-	BACKGROUND_DISPLAY_FLAG              = 0
-	OBJ_ON_FLAG                          = 1
-	OBJ_BLOCK_COMPOSITION_SELECTION_FLAG = 2
-	BG_CODE_AREA_SELECTION_FLAG          = 3
-	BG_CHARACTER_DATA_SELECTION_FLAG     = 4
-	WINDOWING_ON_FLAG                    = 5
-	WINDOW_CODE_AREA_SELECTION_FLAG      = 6
-	LCD_CONTROLLER_OPERATION_STOP_FLAG   = 7
-)
-
 const (
 	MODE0 = 0x00 // HBlank
 	MODE1 = 0x01 // VBlank
@@ -42,7 +30,6 @@ type GPU struct {
 	VRAM [16384]byte
 	OAM  [160]byte
 
-	LCDC byte // LCD Control
 	STAT byte // LCD Status/Mode
 	SCY  byte // Scroll Y
 	SCX  byte // Scroll X
@@ -54,6 +41,25 @@ type GPU struct {
 	OBP1 byte
 	WY   byte // Window Y
 	WX   byte // Window X
+
+	// LCD Control byte
+	LCDC byte
+	// LCDC Bit 7 - LCD Display Enable             (0=Off, 1=On)
+	lcdEnabled bool
+	// LCDC Bit 6 - Window Tile Map Display Select (0=9800-9BFF, 1=9C00-9FFF)
+	windowMapLocation uint16
+	// LCDC Bit 5 - Window Display Enable          (0=Off, 1=On)
+	windowEnabled bool
+	// LCDC Bit 4 - BG & Window Tile Data Select   (0=8800-97FF, 1=8000-8FFF)
+	tileDataLocation uint16
+	// LCDC Bit 3 - BG Tile Map Display Select     (0=9800-9BFF, 1=9C00-9FFF)
+	backgroundMapLocation uint16
+	// LCDC Bit 2 - OBJ (Sprite) Size              (0=8x8, 1=8x16)
+	spriteSize byte
+	// LCDC Bit 1 - OBJ (Sprite) Display Enable    (0=Off, 1=On)
+	spriteEnabled bool
+	// LCDC Bit 0 - BG Display (for CGB see below) (0=Off, 1=On)
+	backgroundEnabled bool
 
 	Cycles uint // Number of cycles since the last LCD Status Mode Change
 }
@@ -112,6 +118,7 @@ func (gpu *GPU) WriteByte(addr uint16, value byte) {
 	switch {
 	case addr == LCDC:
 		gpu.LCDC = value
+		gpu.setLCDCFields(value)
 	case addr == STAT:
 		gpu.STAT = (0xF8 & value) | gpu.GetSTATMode()
 	case addr == SCY:
@@ -146,6 +153,50 @@ func (gpu *GPU) WriteByte(addr uint16, value byte) {
 	}
 }
 
+// setLCDCFields takes a byte written to LCDC
+// and extracts the attributes to set fields on the GPU Struct
+func (gpu *GPU) setLCDCFields(value byte) {
+	// LCDC Bit 7 - LCD Display Enable             (0=Off, 1=On)
+	gpu.lcdEnabled = IsBitSet(value, 7)
+
+	// LCDC Bit 6 - Window Tile Map Display Select (0=9800-9BFF, 1=9C00-9FFF)
+	if IsBitSet(value, 6) {
+		gpu.windowMapLocation = 0x9C00
+	} else {
+		gpu.windowMapLocation = 0x9800
+	}
+
+	// LCDC Bit 5 - Window Display Enable          (0=Off, 1=On)
+	gpu.windowEnabled = IsBitSet(value, 5)
+
+	// LCDC Bit 4 - BG & Window Tile Data Select   (0=8800-97FF, 1=8000-8FFF)
+	if IsBitSet(value, 4) {
+		gpu.tileDataLocation = 0x8000
+	} else {
+		gpu.tileDataLocation = 0x8800
+	}
+
+	// LCDC Bit 3 - BG Tile Map Display Select     (0=9800-9BFF, 1=9C00-9FFF)
+	if IsBitSet(value, 3) {
+		gpu.backgroundMapLocation = 0x9C00
+	} else {
+		gpu.backgroundMapLocation = 0x9800
+	}
+
+	// LCDC Bit 2 - OBJ (Sprite) Size              (0=8x8, 1=8x16)
+	if IsBitSet(value, 2) {
+		gpu.spriteSize = 16
+	} else {
+		gpu.spriteSize = 8
+	}
+
+	// LCDC Bit 1 - OBJ (Sprite) Display Enable    (0=Off, 1=On)
+	gpu.spriteEnabled = IsBitSet(value, 1)
+
+	// LCDC Bit 0 - BG Display (for CGB see below) (0=Off, 1=On)
+	gpu.backgroundEnabled = IsBitSet(value, 0)
+}
+
 func (gpu *GPU) GetSTATMode() byte {
 	return gpu.STAT & 0x03
 }
@@ -155,7 +206,7 @@ func (gpu *GPU) SetSTATMode(mode byte) {
 }
 
 func (gpu *GPU) Step(cycles byte) {
-	if gpu.isLCDCEnabled() {
+	if gpu.lcdEnabled {
 		gpu.Cycles += uint(cycles * 4)
 
 		// STAT indicates the current status of the LCD controller.
@@ -197,7 +248,7 @@ func (gpu *GPU) Step(cycles byte) {
 				gpu.Cycles = 0
 
 				// Increase the scanline
-				gpu.LY += 1
+				gpu.LY++
 
 				// If Scanline is 153 we have done 10 lines of VBlank
 				if gpu.LY > 153 {
@@ -259,23 +310,19 @@ func (gpu *GPU) Step(cycles byte) {
 	}
 }
 
-func (gpu *GPU) isLCDCEnabled() bool {
-	return IsBitSet(gpu.LCDC, LCD_CONTROLLER_OPERATION_STOP_FLAG)
-}
-
 func (gpu *GPU) renderTiles() {
 	windowEnabled := false
-	if IsBitSet(gpu.LCDC, WINDOWING_ON_FLAG) {
+	if gpu.windowEnabled {
 		if gpu.WY <= gpu.LY {
 			windowEnabled = true
 		}
 	}
 
-	tileDataAreaSelection := gpu.getBGCodeAreaSelection()
+	tileDataAreaSelection := gpu.backgroundMapLocation
 	pixelY := gpu.LY + gpu.SCY
 
 	if windowEnabled {
-		tileDataAreaSelection = gpu.getWindowCodeAreaSelection()
+		tileDataAreaSelection = gpu.windowMapLocation
 		// Add ScrollY to the Scanline to get the current pixel Y position
 		pixelY = gpu.LY - gpu.WY
 	}
@@ -333,7 +380,7 @@ func (gpu *GPU) renderSprites() {
 		yFlip := IsBitSet(attributes, 6)
 		xFlip := IsBitSet(attributes, 5)
 
-		if (gpu.LY >= yPos) && (gpu.LY < (yPos + gpu.getSpriteSize())) {
+		if (gpu.LY >= yPos) && (gpu.LY < (yPos + gpu.spriteSize)) {
 			data1, data2 := gpu.getObjData(characterCode, yPos, yFlip)
 
 			// its easier to read in from right to left as pixel 0 is
@@ -366,60 +413,29 @@ func (gpu *GPU) renderSprites() {
 }
 
 func (gpu *GPU) renderScanline() {
-	if IsBitSet(gpu.LCDC, BACKGROUND_DISPLAY_FLAG) {
+	if gpu.backgroundEnabled {
 		gpu.renderTiles()
 	}
 
-	if IsBitSet(gpu.LCDC, OBJ_ON_FLAG) {
+	if gpu.spriteEnabled {
 		gpu.renderSprites()
 	}
-}
-
-func (gpu *GPU) getBGCodeAreaSelection() uint16 {
-	var BGCodeAreaSelection uint16
-	if IsBitSet(gpu.LCDC, BG_CODE_AREA_SELECTION_FLAG) {
-		BGCodeAreaSelection = 0x9C00
-	} else {
-		BGCodeAreaSelection = 0x9800
-	}
-
-	return BGCodeAreaSelection
-}
-
-func (gpu *GPU) getBGCharacterDataSelection() (uint16, uint16) {
-	var BGCharacterDataSelection uint16
-	var offset uint16
-	if IsBitSet(gpu.LCDC, BG_CHARACTER_DATA_SELECTION_FLAG) {
-		BGCharacterDataSelection = 0x8000
-		offset = 0
-	} else {
-		BGCharacterDataSelection = 0x8800
-		offset = 128
-	}
-
-	return BGCharacterDataSelection, offset
-}
-
-func (gpu *GPU) getWindowCodeAreaSelection() uint16 {
-	var WindowCodeAreaSelection uint16
-	if IsBitSet(gpu.LCDC, WINDOW_CODE_AREA_SELECTION_FLAG) {
-		WindowCodeAreaSelection = 0x9C00
-	} else {
-		WindowCodeAreaSelection = 0x9800
-	}
-
-	return WindowCodeAreaSelection
 }
 
 func (gpu *GPU) getTileDataAddress(tileIdentifier byte) uint16 {
 	// When the BGCharacterDataSelection is 0x8800 the tileIndentifier is
 	// a signed byte -127 - 127, the offset corrects for this
 	// when looking up the memory location
-	BGCharacterDataSelection, offset := gpu.getBGCharacterDataSelection()
+	offset := uint16(0)
+
+	if gpu.tileDataLocation == 0x8800 {
+		offset = 128
+	}
+
 	if tileIdentifier > 127 {
-		return BGCharacterDataSelection + (uint16(tileIdentifier)-offset)*16 // 16 = tile size in bytes
+		return gpu.tileDataLocation + (uint16(tileIdentifier)-offset)*16 // 16 = tile size in bytes
 	} else {
-		return BGCharacterDataSelection + (uint16(tileIdentifier)+offset)*16 // 16 = tile size in bytes
+		return gpu.tileDataLocation + (uint16(tileIdentifier)+offset)*16 // 16 = tile size in bytes
 
 	}
 }
@@ -440,7 +456,7 @@ func (gpu *GPU) getObjData(characterCode byte, yPos byte, yFlip bool) (byte, byt
 	line := int(gpu.LY - yPos)
 
 	if yFlip {
-		line -= int(gpu.getSpriteSize())
+		line -= int(gpu.spriteSize)
 		line *= -1
 	}
 
@@ -453,16 +469,6 @@ func (gpu *GPU) getObjData(characterCode byte, yPos byte, yFlip bool) (byte, byt
 	data2 := gpu.gameboy.ReadByte(uint16(objDataAddress + 1))
 
 	return data1, data2
-}
-
-func (gpu *GPU) getSpriteSize() byte {
-	switch IsBitSet(gpu.LCDC, OBJ_BLOCK_COMPOSITION_SELECTION_FLAG) {
-	case false:
-		return 8
-	case true:
-		return 16
-	}
-	return 0
 }
 
 func (gpu *GPU) getColorFromBGPalette(colorIdentifier byte) uint32 {

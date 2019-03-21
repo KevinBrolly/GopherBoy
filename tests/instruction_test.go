@@ -1,7 +1,7 @@
 package Gameboy_test
 
 import (
-	"GoBoy/Gameboy"
+	"GopherBoy/Gameboy"
 	"bytes"
 	"fmt"
 	"testing"

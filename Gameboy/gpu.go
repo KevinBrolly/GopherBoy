@@ -401,10 +401,7 @@ func (gpu *GPU) renderSprites() {
 					colorIdentifier = SetBit(colorIdentifier, 0)
 				}
 
-				var xPix int = 0 - tilePixel
-				xPix += 7
-
-				var pixel int = int(xPos) + xPix
+				var pixel int = int(xPos) + (7 - tilePixel)
 
 				gpu.Window.Framebuffer[pixel+(160*int(gpu.LY))] = gpu.getSpritePalette(colorIdentifier, attributes)
 			}

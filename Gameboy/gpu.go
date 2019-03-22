@@ -64,6 +64,12 @@ type GPU struct {
 	Cycles uint // Number of cycles since the last LCD Status Mode Change
 }
 
+type pixelAttributes struct {
+	colorIdentifier byte
+	palette         byte
+	priority        byte
+}
+
 func NewGPU(gameboy *Gameboy) *GPU {
 	window := NewWindow("Gameboy", WIDTH, HEIGHT, gameboy.Quit)
 
@@ -310,7 +316,9 @@ func (gpu *GPU) Step(cycles byte) {
 	}
 }
 
-func (gpu *GPU) renderTiles() {
+func (gpu *GPU) generateTileScanline() [160]*pixelAttributes {
+	var scanline [160]*pixelAttributes
+
 	windowEnabled := false
 	if gpu.windowEnabled {
 		if gpu.WY <= gpu.LY {
@@ -340,11 +348,19 @@ func (gpu *GPU) renderTiles() {
 
 		colorIdentifier := gpu.getTileColorIdentifierForPixel(tileMap, pixelX, pixelY)
 
-		gpu.Window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
+		scanline[pixel] = &pixelAttributes{
+			colorIdentifier: colorIdentifier,
+			palette:         gpu.BGP,
+		}
+		//gpu.Window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
 	}
+
+	return scanline
 }
 
-func (gpu *GPU) renderSprites() {
+func (gpu *GPU) generateSpriteScanline() [160]*pixelAttributes {
+	var scanline [160]*pixelAttributes
+
 	for sprite := 0; sprite < 40; sprite++ {
 		index := sprite * 4
 		yPos := gpu.OAM[index] - 16
@@ -378,19 +394,49 @@ func (gpu *GPU) renderSprites() {
 
 				var pixel int = int(xPos) + (7 - tilePixel)
 
-				gpu.Window.Framebuffer[pixel+(160*int(gpu.LY))] = gpu.getSpritePalette(colorIdentifier, attributes)
+				var palette byte
+				if IsBitSet(attributes, 4) {
+					palette = gpu.OBP1
+				} else {
+					palette = gpu.OBP0
+				}
+
+				prioritySet := IsBitSet(attributes, 7)
+				var priority byte
+				if prioritySet {
+					priority = 1
+				}
+
+				if (pixel >= 0) && (pixel <= 159) && colorIdentifier != 0 {
+					scanline[pixel] = &pixelAttributes{
+						colorIdentifier: colorIdentifier,
+						palette:         palette,
+						priority:        priority,
+					}
+				}
+				//gpu.Window.Framebuffer[pixel+(160*int(gpu.LY))] = gpu.getSpritePalette(colorIdentifier, attributes)
 			}
 		}
 	}
+	return scanline
 }
 
 func (gpu *GPU) renderScanline() {
+	var scanline [2][160]*pixelAttributes
 	if gpu.backgroundEnabled {
-		gpu.renderTiles()
+		scanline[0] = gpu.generateTileScanline()
 	}
 
 	if gpu.spriteEnabled {
-		gpu.renderSprites()
+		scanline[1] = gpu.generateSpriteScanline()
+	}
+
+	for pixel := 0; pixel < 160; pixel++ {
+		if scanline[1][pixel] != nil && (scanline[1][pixel].priority == 0 || scanline[0][pixel].colorIdentifier == 0) {
+			gpu.Window.Framebuffer[pixel+160*int(gpu.LY)] = gpu.applyPalette(scanline[1][pixel].colorIdentifier, scanline[1][pixel].palette)
+		} else {
+			gpu.Window.Framebuffer[pixel+160*int(gpu.LY)] = gpu.applyPalette(scanline[0][pixel].colorIdentifier, scanline[0][pixel].palette)
+		}
 	}
 }
 
@@ -472,44 +518,8 @@ func (gpu *GPU) getObjData(characterCode byte, yPos byte, yFlip bool) (byte, byt
 	return data1, data2
 }
 
-func (gpu *GPU) getColorFromBGPalette(colorIdentifier byte) uint32 {
+func (gpu *GPU) applyPalette(colorIdentifier byte, palette byte) uint32 {
 	pixelFormat, _ := sdl.AllocFormat(uint(sdl.PIXELFORMAT_RGBA32))
-	var color byte
-	var bitmask byte = 0x3
-	switch colorIdentifier {
-	case 0:
-		color = gpu.BGP & bitmask
-	case 1:
-		color = (gpu.BGP >> 2) & bitmask
-	case 2:
-		color = (gpu.BGP >> 4) & bitmask
-	case 3:
-		color = (gpu.BGP >> 6) & bitmask
-	}
-
-	switch color {
-	case 0:
-		return sdl.MapRGB(pixelFormat, 255, 255, 255)
-	case 1:
-		return sdl.MapRGB(pixelFormat, 192, 192, 192)
-	case 2:
-		return sdl.MapRGB(pixelFormat, 96, 96, 96)
-	case 3:
-		return sdl.MapRGB(pixelFormat, 0, 0, 0)
-	}
-	return 0
-}
-
-func (gpu *GPU) getSpritePalette(colorIdentifier byte, attributes byte) uint32 {
-	pixelFormat, _ := sdl.AllocFormat(uint(sdl.PIXELFORMAT_RGBA32))
-
-	var palette byte
-	if IsBitSet(attributes, 4) {
-		palette = gpu.OBP1
-	} else {
-		palette = gpu.OBP0
-	}
-
 	var color byte
 	var bitmask byte = 0x3
 	switch colorIdentifier {
@@ -525,7 +535,7 @@ func (gpu *GPU) getSpritePalette(colorIdentifier byte, attributes byte) uint32 {
 
 	switch color {
 	case 0:
-		return sdl.MapRGBA(pixelFormat, 255, 255, 255, 0)
+		return sdl.MapRGB(pixelFormat, 255, 255, 255)
 	case 1:
 		return sdl.MapRGB(pixelFormat, 192, 192, 192)
 	case 2:

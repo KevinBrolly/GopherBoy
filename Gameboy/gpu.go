@@ -352,7 +352,6 @@ func (gpu *GPU) generateTileScanline() [160]*pixelAttributes {
 			colorIdentifier: colorIdentifier,
 			palette:         gpu.BGP,
 		}
-		//gpu.Window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
 	}
 
 	return scanline
@@ -414,7 +413,6 @@ func (gpu *GPU) generateSpriteScanline() [160]*pixelAttributes {
 						priority:        priority,
 					}
 				}
-				//gpu.Window.Framebuffer[pixel+(160*int(gpu.LY))] = gpu.getSpritePalette(colorIdentifier, attributes)
 			}
 		}
 	}
@@ -440,7 +438,7 @@ func (gpu *GPU) renderScanline() {
 		// and the sprite priority is 0 or the background pixels
 		// colorIdentifier is 0, then the sprite is rendered on top
 		// of the background, otherwise the background is rendered.
-		if spritePixel != nil && (spritePixel.priority == 0 || spritePixel.colorIdentifier == 0) {
+		if spritePixel != nil && (spritePixel.priority == 0 || backgroundPixel.colorIdentifier == 0) {
 			pixel = gpu.applyPalette(spritePixel.colorIdentifier, spritePixel.palette)
 		} else {
 			pixel = gpu.applyPalette(backgroundPixel.colorIdentifier, backgroundPixel.palette)

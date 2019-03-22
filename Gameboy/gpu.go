@@ -431,12 +431,22 @@ func (gpu *GPU) renderScanline() {
 		scanline[1] = gpu.generateSpriteScanline()
 	}
 
-	for pixel := 0; pixel < 160; pixel++ {
-		if scanline[1][pixel] != nil && (scanline[1][pixel].priority == 0 || scanline[0][pixel].colorIdentifier == 0) {
-			gpu.Window.Framebuffer[pixel+160*int(gpu.LY)] = gpu.applyPalette(scanline[1][pixel].colorIdentifier, scanline[1][pixel].palette)
+	for x := 0; x < 160; x++ {
+		var pixel uint32
+		backgroundPixel := scanline[0][x]
+		spritePixel := scanline[1][x]
+
+		// If there is a sprite at this position in the scanline
+		// and the sprite priority is 0 or the background pixels
+		// colorIdentifier is 0, then the sprite is rendered on top
+		// of the background, otherwise the background is rendered.
+		if spritePixel != nil && (spritePixel.priority == 0 || spritePixel.colorIdentifier == 0) {
+			pixel = gpu.applyPalette(spritePixel.colorIdentifier, spritePixel.palette)
 		} else {
-			gpu.Window.Framebuffer[pixel+160*int(gpu.LY)] = gpu.applyPalette(scanline[0][pixel].colorIdentifier, scanline[0][pixel].palette)
+			pixel = gpu.applyPalette(backgroundPixel.colorIdentifier, backgroundPixel.palette)
 		}
+
+		gpu.Window.Framebuffer[x+160*int(gpu.LY)] = pixel
 	}
 }
 

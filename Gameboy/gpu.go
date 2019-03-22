@@ -371,7 +371,16 @@ func (gpu *GPU) generateSpriteScanline() [160]*pixelAttributes {
 		xFlip := IsBitSet(attributes, 5)
 
 		if (gpu.LY >= yPos) && (gpu.LY < (yPos + gpu.spriteSize)) {
-			data1, data2 := gpu.getObjData(characterCode, yPos, yFlip)
+			line := int(gpu.LY - yPos)
+
+			if yFlip {
+				line -= int(gpu.spriteSize)
+				line *= -1
+			}
+
+			line *= 2 // same as for tiles
+
+			data1, data2 := gpu.getSpriteDataForLine(characterCode, line)
 
 			// its easier to read in from right to left as pixel 0 is
 			// bit 7 in the colour data, pixel 1 is bit 6 etc...
@@ -391,7 +400,7 @@ func (gpu *GPU) generateSpriteScanline() [160]*pixelAttributes {
 					colorIdentifier = SetBit(colorIdentifier, 0)
 				}
 
-				var pixel int = int(xPos) + (7 - tilePixel)
+				pixel := int(xPos) + (7 - tilePixel)
 
 				var palette byte
 				if IsBitSet(attributes, 4) {
@@ -507,21 +516,12 @@ func (gpu *GPU) getTileDataAddress(tileMap uint16, tileIdentifier byte) uint16 {
 	}
 }
 
-func (gpu *GPU) getObjData(characterCode byte, yPos byte, yFlip bool) (byte, byte) {
-	line := int(gpu.LY - yPos)
+func (gpu *GPU) getSpriteDataForLine(characterCode byte, line int) (byte, byte) {
+	spriteDataStorage := 0x8000
+	spriteDataAddress := spriteDataStorage + (int(characterCode) * 16) + line // 16 = obj size in bytes
 
-	if yFlip {
-		line -= int(gpu.spriteSize)
-		line *= -1
-	}
-
-	line *= 2 // same as for tiles
-
-	objCharacterDataStorage := 0x8000
-	objDataAddress := objCharacterDataStorage + (int(characterCode) * 16) + line // 16 = obj size in bytes
-
-	data1 := gpu.gameboy.ReadByte(uint16(objDataAddress))
-	data2 := gpu.gameboy.ReadByte(uint16(objDataAddress + 1))
+	data1 := gpu.gameboy.ReadByte(uint16(spriteDataAddress))
+	data2 := gpu.gameboy.ReadByte(uint16(spriteDataAddress + 1))
 
 	return data1, data2
 }

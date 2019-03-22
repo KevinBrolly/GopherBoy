@@ -318,19 +318,14 @@ func (gpu *GPU) renderTiles() {
 		}
 	}
 
-	tileDataAreaSelection := gpu.backgroundMapLocation
+	tileMap := gpu.backgroundMapLocation
 	pixelY := gpu.LY + gpu.SCY
 
 	if windowEnabled {
-		tileDataAreaSelection = gpu.windowMapLocation
+		tileMap = gpu.windowMapLocation
 		// Add ScrollY to the Scanline to get the current pixel Y position
 		pixelY = gpu.LY - gpu.WY
 	}
-
-	// Divide the pixel being drawn Y position by 8 (for 8 pixels in tile)
-	// and multiply by 32 (for number of tiles in the background map)
-	// to get the row number for the tile in the background map
-	tileRow := uint16(pixelY/8) * 32
 
 	for pixel := byte(0); pixel < 160; pixel++ {
 		// Add pixel being drawn in scanline to scrollX to get the current pixel X position
@@ -343,27 +338,7 @@ func (gpu *GPU) renderTiles() {
 			}
 		}
 
-		// which of the 8 horizontal tiles does this pixel fall within?
-		tileCol := uint16(pixelX / 8)
-
-		tileIdentifier := gpu.gameboy.ReadByte(tileDataAreaSelection + tileRow + tileCol)
-		tileDataAddress := gpu.getTileDataAddress(tileIdentifier)
-
-		data1, data2 := gpu.getTileData(tileDataAddress, pixelY)
-
-		// pixel 0 in the tile is it 7 of data 1 and data2.
-		// Pixel 1 is bit 6 etc..
-		pixelBit := int(pixelX % 8)
-		pixelBit -= 7
-		pixelBit *= -1
-
-		var colorIdentifier byte
-		if IsBitSet(data1, byte(pixelBit)) {
-			colorIdentifier = SetBit(colorIdentifier, 1)
-		}
-		if IsBitSet(data2, byte(pixelBit)) {
-			colorIdentifier = SetBit(colorIdentifier, 0)
-		}
+		colorIdentifier := gpu.getTileColorIdentifierForPixel(tileMap, pixelX, pixelY)
 
 		gpu.Window.Framebuffer[int(pixel)+(160*int(gpu.LY))] = gpu.getColorFromBGPalette(colorIdentifier)
 	}
@@ -419,34 +394,63 @@ func (gpu *GPU) renderScanline() {
 	}
 }
 
-func (gpu *GPU) getTileDataAddress(tileIdentifier byte) uint16 {
-	// When the BGCharacterDataSelection is 0x8800 the tileIndentifier is
+func (gpu *GPU) getTileColorIdentifierForPixel(tileMap uint16, pixelX byte, pixelY byte) byte {
+	tileIdentifier := gpu.getTileIdentifierForPixel(tileMap, pixelX, pixelY)
+	tileDataAddress := gpu.getTileDataAddress(gpu.tileDataLocation, tileIdentifier)
+
+	// Find the correct vertical line we're on of the
+	// tile to get the tile data from memory
+	line := pixelY % 8
+	line = line * 2 // each vertical line takes up two bytes of memory
+
+	data1 := gpu.gameboy.ReadByte(tileDataAddress + uint16(line))
+	data2 := gpu.gameboy.ReadByte(tileDataAddress + uint16(line) + 1)
+
+	// pixel 0 in the tile is it 7 of data 1 and data2.
+	// Pixel 1 is bit 6 etc..
+	pixelBit := int(pixelX % 8)
+	pixelBit -= 7
+	pixelBit *= -1
+
+	var colorIdentifier byte
+	if IsBitSet(data1, byte(pixelBit)) {
+		colorIdentifier = SetBit(colorIdentifier, 1)
+	}
+	if IsBitSet(data2, byte(pixelBit)) {
+		colorIdentifier = SetBit(colorIdentifier, 0)
+	}
+
+	return colorIdentifier
+}
+
+func (gpu *GPU) getTileIdentifierForPixel(tileMap uint16, pixelX byte, pixelY byte) byte {
+	// Divide the pixelY position by 8 (for 8 pixels in tile)
+	// and multiply by 32 (for number of tiles in the background map)
+	// to get the row number for the tile in the background map
+	tileRow := uint16(pixelY/8) * 32
+
+	// Divide the pixelX position by 8 (for 8 tiles in horizontal row)
+	// to get the column number for the tile in the background map
+	tileCol := uint16(pixelX / 8)
+
+	return gpu.gameboy.ReadByte(tileMap + tileRow + tileCol)
+}
+
+func (gpu *GPU) getTileDataAddress(tileMap uint16, tileIdentifier byte) uint16 {
+	// When the tileMap used is 0x8800 the tileIndentifier is
 	// a signed byte -127 - 127, the offset corrects for this
 	// when looking up the memory location
 	offset := uint16(0)
-
-	if gpu.tileDataLocation == 0x8800 {
+	if tileMap == 0x8800 {
 		offset = 128
 	}
 
 	if tileIdentifier > 127 {
-		return gpu.tileDataLocation + (uint16(tileIdentifier)-offset)*16 // 16 = tile size in bytes
+		return tileMap + (uint16(tileIdentifier)-offset)*16 // 16 = tile size in bytes
 	} else {
-		return gpu.tileDataLocation + (uint16(tileIdentifier)+offset)*16 // 16 = tile size in bytes
+		return tileMap + (uint16(tileIdentifier)+offset)*16 // 16 = tile size in bytes
 
 	}
-}
-
-func (gpu *GPU) getTileData(tileDataAddress uint16, pixelY byte) (byte, byte) {
-	// find the correct vertical line we're on of the
-	// tile to get the tile data
-	// from in memory
-	line := pixelY % 8
-	line = line * 2 // each vertical line takes up two bytes of memory
-	data1 := gpu.gameboy.ReadByte(tileDataAddress + uint16(line))
-	data2 := gpu.gameboy.ReadByte(tileDataAddress + uint16(line) + 1)
-
-	return data1, data2
 }
 
 func (gpu *GPU) getObjData(characterCode byte, yPos byte, yFlip bool) (byte, byte) {

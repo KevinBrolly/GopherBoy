@@ -18,11 +18,11 @@ type Cartridge struct {
 	CartridgeData  []byte
 	ROM            []byte
 	RAM            []byte
-	MBC            byte
+	MBC            int
 	RAMEnabled     bool
-	CurrentROMBank byte
-	CurrentRAMBank byte
-	BankingMode    byte
+	CurrentROMBank int
+	CurrentRAMBank int
+	BankingMode    int
 }
 
 func NewCartridge(gameboy *Gameboy) *Cartridge {
@@ -71,10 +71,10 @@ func (c *Cartridge) ReadByte(addr uint16) byte {
 		return c.CartridgeData[addr]
 	case addr >= 0x4000 && addr <= 0x7FFF:
 		addr := addr - 0x4000
-		return c.CartridgeData[addr+(uint16(c.CurrentROMBank)*0x4000)]
+		return c.CartridgeData[int(addr)+(int(c.CurrentROMBank)*0x4000)]
 	case addr >= 0xA000 && addr <= 0xBFFF:
 		addr := addr - 0xA000
-		return c.RAM[addr+(uint16(c.CurrentRAMBank)*0x2000)]
+		return c.RAM[int(addr)+c.CurrentRAMBank*0x2000]
 	}
 
 	return 0
@@ -93,7 +93,7 @@ func (c *Cartridge) WriteByte(addr uint16, value byte) {
 					c.RAMEnabled = false
 				}
 			case addr >= 0x2000 && addr <= 0x3FFF:
-				c.CurrentROMBank = (c.CurrentROMBank & 0xE0) | (value & 0x1F)
+				c.CurrentROMBank = (c.CurrentROMBank & 0xE0) | (int(value & 0x1F))
 				// When 0 is written, the MBC translates that to Bank 1
 				// This is fine because ROM Bank 0 can be always directly accessed by reading from 0000-3FFF
 				if c.CurrentROMBank == 0 {
@@ -102,14 +102,14 @@ func (c *Cartridge) WriteByte(addr uint16, value byte) {
 			case addr >= 0x4000 && addr <= 0x5FFF:
 				switch c.BankingMode {
 				case ROMBankingMode:
-					c.CurrentROMBank = (c.CurrentROMBank & 0x1F) | (value & 0xE0)
+					c.CurrentROMBank = (c.CurrentROMBank & 0x1F) | (int(value & 0xE0))
 					// When 0 is written, the MBC translates that to Bank 1
 					// This is fine because ROM Bank 0 can be always directly accessed by reading from 0000-3FFF
 					if c.CurrentROMBank == 0 {
 						c.CurrentROMBank = 1
 					}
 				case RAMBankingMode:
-					c.CurrentRAMBank = value & 0x3
+					c.CurrentRAMBank = int(value & 0x3)
 				}
 			case addr >= 0x6000 && addr <= 0x7FFF:
 				switch value & 0x1 {

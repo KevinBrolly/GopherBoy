@@ -87,6 +87,7 @@ func NewGPU(gameboy *Gameboy) *GPU {
 		WX:      0x00,
 		STAT:    0x85,
 	}
+	gpu.setLCDCFields(0x91)
 	return gpu
 }
 

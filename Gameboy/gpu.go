@@ -14,13 +14,58 @@ const (
 	MODE1 = 0x01 // VBlank
 	MODE2 = 0x02 // OAM Access
 	MODE3 = 0x03 // VRAM Acess
-
-	MATCH_FLAG      = 2 // LYC=LY Flag
-	MODE0_INTERRUPT = 3
-	MODE1_INTERRUPT = 4
-	MODE2_INTERRUPT = 5
-	MATCH_INTERRUPT = 6 // LYC=LY Interrupt
 )
+
+type stat struct {
+	coincidenceInterruptEnabled bool
+	oamInterruptEnabled         bool
+	vblankInterruptEnabled      bool
+	hblankInterruptEnabled      bool
+	coincidenceFlag             bool
+	mode                        byte
+}
+
+func (s *stat) setStat(value byte) {
+	s.coincidenceInterruptEnabled = IsBitSet(value, 6)
+	s.oamInterruptEnabled = IsBitSet(value, 5)
+	s.vblankInterruptEnabled = IsBitSet(value, 4)
+	s.hblankInterruptEnabled = IsBitSet(value, 3)
+}
+
+func (s *stat) getStat() byte {
+	// Start with 0x80 as bit 7 is unused/always returns 1
+	var stat byte = 0x80
+
+	// Bit 6 LYC=LY Coincidence Interrupt
+	if s.coincidenceInterruptEnabled {
+		stat = SetBit(stat, 6)
+	}
+
+	// Bit 5 Mode 2 OAM Interrupt
+	if s.oamInterruptEnabled {
+		stat = SetBit(stat, 6)
+	}
+
+	// Bit 4 Mode 1 V-Blank Interrupt
+	if s.vblankInterruptEnabled {
+		stat = SetBit(stat, 6)
+	}
+
+	// Bit 3 Mode 0 H-Blank Interrupt
+	if s.hblankInterruptEnabled {
+		stat = SetBit(stat, 6)
+	}
+
+	// Bit 2 Coincidence Flag (0:LYC<>LY, 1:LYC=LY)
+	if s.coincidenceFlag {
+		stat = SetBit(stat, 6)
+	}
+
+	// & with the mode to set this on stat
+	stat &= s.mode
+
+	return stat
+}
 
 type GPU struct {
 	gameboy *Gameboy
@@ -30,10 +75,10 @@ type GPU struct {
 	VRAM [16384]byte
 	OAM  [160]byte
 
-	STAT byte // LCD Status/Mode
-	SCY  byte // Scroll Y
-	SCX  byte // Scroll X
-	LY   byte // Scanline
+	STAT *stat // LCD Status/Mode
+	SCY  byte  // Scroll Y
+	SCX  byte  // Scroll X
+	LY   byte  // Scanline
 	LYC  byte
 	DMA  byte
 	BGP  byte
@@ -73,9 +118,19 @@ type pixelAttributes struct {
 func NewGPU(gameboy *Gameboy) *GPU {
 	window := NewWindow("Gameboy", WIDTH, HEIGHT, gameboy.Quit)
 
+	STAT := &stat{
+		coincidenceInterruptEnabled: false,
+		oamInterruptEnabled:         false,
+		vblankInterruptEnabled:      false,
+		hblankInterruptEnabled:      false,
+		coincidenceFlag:             true,
+		mode:                        MODE1,
+	}
+
 	gpu := &GPU{
 		gameboy: gameboy,
 		Window:  window,
+		STAT:    STAT,
 		LCDC:    0x91,
 		SCY:     0x00,
 		SCX:     0x00,
@@ -85,9 +140,10 @@ func NewGPU(gameboy *Gameboy) *GPU {
 		OBP1:    0xFF,
 		WY:      0x00,
 		WX:      0x00,
-		STAT:    0x85,
 	}
+
 	gpu.setLCDCFields(0x91)
+
 	return gpu
 }
 
@@ -96,7 +152,7 @@ func (gpu *GPU) ReadByte(addr uint16) byte {
 	case addr == LCDC:
 		return gpu.LCDC
 	case addr == STAT:
-		return gpu.STAT
+		return gpu.STAT.getStat()
 	case addr == SCY:
 		return gpu.SCY
 	case addr == SCX:
@@ -127,7 +183,7 @@ func (gpu *GPU) WriteByte(addr uint16, value byte) {
 		gpu.LCDC = value
 		gpu.setLCDCFields(value)
 	case addr == STAT:
-		gpu.STAT = (0xF8 & value) | gpu.GetSTATMode()
+		gpu.STAT.setStat(value)
 	case addr == SCY:
 		gpu.SCY = value
 	case addr == SCX:
@@ -204,20 +260,12 @@ func (gpu *GPU) setLCDCFields(value byte) {
 	gpu.backgroundEnabled = IsBitSet(value, 0)
 }
 
-func (gpu *GPU) GetSTATMode() byte {
-	return gpu.STAT & 0x03
-}
-
-func (gpu *GPU) SetSTATMode(mode byte) {
-	gpu.STAT = (gpu.STAT & 0xFC) | mode
-}
-
 func (gpu *GPU) Step(cycles byte) {
 	if gpu.lcdEnabled {
 		gpu.Cycles += uint(cycles * 4)
 
 		// STAT indicates the current status of the LCD controller.
-		switch gpu.GetSTATMode() {
+		switch gpu.STAT.mode {
 		// HBlank
 		// After the last HBlank, push the screen data to canvas
 		case MODE0:
@@ -234,14 +282,14 @@ func (gpu *GPU) Step(cycles byte) {
 					gpu.gameboy.requestInterrupt(VBLANK_INTERRUPT)
 
 					// Enter GPU Mode 1/VBlank
-					gpu.SetSTATMode(MODE1)
-					if IsBitSet(gpu.STAT, MODE1_INTERRUPT) {
+					gpu.STAT.mode = MODE1
+					if gpu.STAT.vblankInterruptEnabled {
 						gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
 					}
 				} else {
 					// Enter GPU Mode 2/OAM Access
-					gpu.SetSTATMode(MODE2)
-					if IsBitSet(gpu.STAT, MODE2_INTERRUPT) {
+					gpu.STAT.mode = MODE2
+					if gpu.STAT.oamInterruptEnabled {
 						gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
 					}
 				}
@@ -261,8 +309,8 @@ func (gpu *GPU) Step(cycles byte) {
 				if gpu.LY > 153 {
 					// Start of next Frame
 					// Enter GPU Mode 2/OAM Access
-					gpu.SetSTATMode(MODE2)
-					if IsBitSet(gpu.STAT, MODE2_INTERRUPT) {
+					gpu.STAT.mode = MODE2
+					if gpu.STAT.oamInterruptEnabled {
 						gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
 					}
 
@@ -277,7 +325,7 @@ func (gpu *GPU) Step(cycles byte) {
 				// Reset the cycle counter
 				gpu.Cycles = 0
 				// Enter GPU Mode 3
-				gpu.SetSTATMode(MODE3)
+				gpu.STAT.mode = MODE3
 			}
 
 		// VRAM access mode, scanline active
@@ -288,8 +336,8 @@ func (gpu *GPU) Step(cycles byte) {
 				gpu.Cycles = 0
 
 				// Enter GPU Mode 0/HBlank
-				gpu.SetSTATMode(MODE0)
-				if IsBitSet(gpu.STAT, MODE0_INTERRUPT) {
+				gpu.STAT.mode = MODE0
+				if gpu.STAT.hblankInterruptEnabled {
 					gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
 				}
 
@@ -301,19 +349,19 @@ func (gpu *GPU) Step(cycles byte) {
 		// If LY == LYC then set the STAT match flag and perform
 		// the match flag interrupt if it has been requested
 		if gpu.LY == gpu.LYC {
-			gpu.STAT = SetBit(gpu.STAT, MATCH_FLAG)
+			gpu.STAT.coincidenceFlag = true
 
-			if IsBitSet(gpu.STAT, MATCH_INTERRUPT) {
+			if gpu.STAT.coincidenceInterruptEnabled {
 				gpu.gameboy.requestInterrupt(LCDC_INTERRUPT)
 			}
 		} else {
-			gpu.STAT = ClearBit(gpu.STAT, MATCH_FLAG)
+			gpu.STAT.coincidenceFlag = false
 		}
 
 	} else {
 		gpu.Cycles = 456
 		gpu.LY = 0
-		gpu.SetSTATMode(MODE1)
+		gpu.STAT.mode = MODE1
 	}
 }
 

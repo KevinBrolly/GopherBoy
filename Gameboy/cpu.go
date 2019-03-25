@@ -27,14 +27,6 @@ type CPU struct {
 	IE  byte // Interrupt Enabled
 	IME bool // Interrupt Master Enable
 
-	DIV  byte // Divider
-	TIMA byte // Timer Counter
-	TMA  byte // Timer Modulo
-	TAC  byte // Timer Controller
-
-	DividerCounter int
-	TimerCounter   int
-
 	Halt bool
 }
 
@@ -58,14 +50,8 @@ func (cpu *CPU) Reset() {
 
 	cpu.SP = 0xFFFE
 
-	cpu.TIMA = 0x00
-	cpu.TMA = 0x00
-	cpu.TAC = 0x05
-
 	cpu.IE = 0x00
 	cpu.IF = 0xE1
-
-	cpu.TimerCounter = 1024
 }
 
 func (cpu *CPU) GetOpcode() byte {
@@ -121,58 +107,10 @@ func (cpu *CPU) Step() (cycles byte) {
 		cycles = 1
 	}
 
-	cpu.updateTimer(cycles)
+	cpu.gameboy.Timer.Tick(cycles)
 	cpu.handleInterrupts()
 
 	return cycles
-}
-
-func (cpu *CPU) updateTimer(cycles byte) {
-	cycles = cycles * 4
-
-	cpu.updateDividerRegister(cycles)
-
-	if IsBitSet(cpu.TAC, TIMER_STOP) {
-
-		cpu.TimerCounter -= int(cycles)
-
-		if cpu.TimerCounter <= 0 {
-
-			frequency := cpu.getClockFrequency()
-
-			switch frequency {
-			case 0:
-				cpu.TimerCounter = 1024 // frequency 4096
-			case 1:
-				cpu.TimerCounter = 16 // frequency 262144
-			case 2:
-				cpu.TimerCounter = 64 // frequency 65536
-			case 3:
-				cpu.TimerCounter = 256 // frequency 16382
-			}
-
-			// If timer is about to overflow
-			if cpu.TIMA == 255 {
-				cpu.TIMA = cpu.TMA
-				cpu.gameboy.requestInterrupt(TIMER_OVERFLOW_INTERRUPT)
-			} else {
-				cpu.TIMA = cpu.TIMA + 1
-			}
-		}
-	}
-}
-
-func (cpu *CPU) updateDividerRegister(cycles byte) {
-	cpu.DividerCounter += int(cycles)
-
-	if cpu.DividerCounter >= 255 {
-		cpu.DividerCounter = 0
-		cpu.DIV += 1
-	}
-}
-
-func (cpu *CPU) getClockFrequency() byte {
-	return cpu.TAC & 0x03
 }
 
 func (cpu *CPU) handleInterrupts() {

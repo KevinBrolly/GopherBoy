@@ -10,6 +10,7 @@ import (
 type Gameboy struct {
 	CPU        *CPU
 	GPU        *GPU
+	Timer      *Timer
 	Cartridge  *Cartridge
 	Controller *Controller
 
@@ -33,6 +34,7 @@ func NewGameboy() (gameboy *Gameboy) {
 
 	gameboy.GPU = NewGPU(gameboy)
 	gameboy.CPU = NewCPU(gameboy)
+	gameboy.Timer = NewTimer(gameboy)
 	gameboy.Controller = NewController(gameboy)
 	gameboy.Cartridge = NewCartridge(gameboy)
 	return
@@ -121,6 +123,11 @@ func (gameboy *Gameboy) WriteWord(addr uint16, value uint16) {
 
 func (gameboy *Gameboy) ReadByte(addr uint16) byte {
 
+	// Check the Timer
+	if value := gameboy.Timer.ReadByte(addr); value != 0 {
+		return value
+	}
+
 	// Check the GPU
 	if value := gameboy.GPU.ReadByte(addr); value != 0 {
 		return value
@@ -148,16 +155,6 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
 	case addr == DMG_STATUS_REGISTER:
 		return gameboy.dmgStatusRegister
 
-	// Timer
-	case addr == DIV:
-		return gameboy.CPU.DIV
-	case addr == TIMA:
-		return gameboy.CPU.TIMA
-	case addr == TMA:
-		return gameboy.CPU.TMA
-	case addr == TAC:
-		return gameboy.CPU.TAC
-
 	// I/O control handling
 	case addr == IF:
 		return gameboy.CPU.IF
@@ -172,6 +169,9 @@ func (gameboy *Gameboy) ReadByte(addr uint16) byte {
 }
 
 func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
+
+	// Check the timer
+	gameboy.Timer.WriteByte(addr, value)
 
 	// Check the GPU
 	gameboy.GPU.WriteByte(addr, value)
@@ -193,32 +193,6 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
 	// Registers
 	case addr == DMG_STATUS_REGISTER:
 		gameboy.dmgStatusRegister = value
-
-	// Timer
-	case addr == DIV: // Divider
-		gameboy.CPU.DIV = 0
-	case addr == TIMA: // Timer Counter
-		gameboy.CPU.TIMA = value
-	case addr == TMA: // Timer Modulo
-		gameboy.CPU.TMA = value
-	case addr == TAC:
-		currentfreq := gameboy.CPU.getClockFrequency()
-		gameboy.CPU.TAC = value
-
-		newfreq := gameboy.CPU.getClockFrequency()
-
-		if currentfreq != newfreq {
-			switch newfreq {
-			case 0:
-				gameboy.CPU.TimerCounter = 1024 // frequency 4096
-			case 1:
-				gameboy.CPU.TimerCounter = 16 // frequency 262144
-			case 2:
-				gameboy.CPU.TimerCounter = 64 // frequency 65536
-			case 3:
-				gameboy.CPU.TimerCounter = 256 // frequency 16382
-			}
-		}
 
 	// I/O control handling
 	case addr == IF:

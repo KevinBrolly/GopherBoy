@@ -43,27 +43,26 @@ func (s *stat) getStat() byte {
 
 	// Bit 5 Mode 2 OAM Interrupt
 	if s.oamInterruptEnabled {
-		stat = SetBit(stat, 6)
+		stat = SetBit(stat, 5)
 	}
 
 	// Bit 4 Mode 1 V-Blank Interrupt
 	if s.vblankInterruptEnabled {
-		stat = SetBit(stat, 6)
+		stat = SetBit(stat, 4)
 	}
 
 	// Bit 3 Mode 0 H-Blank Interrupt
 	if s.hblankInterruptEnabled {
-		stat = SetBit(stat, 6)
+		stat = SetBit(stat, 3)
 	}
 
 	// Bit 2 Coincidence Flag (0:LYC<>LY, 1:LYC=LY)
 	if s.coincidenceFlag {
-		stat = SetBit(stat, 6)
+		stat = SetBit(stat, 2)
 	}
 
-	// & with the mode to set this on stat
-	stat &= s.mode
-
+	// or with the mode to set this on stat
+	stat |= s.mode
 	return stat
 }
 
@@ -361,7 +360,7 @@ func (gpu *GPU) Step(cycles byte) {
 	} else {
 		gpu.Cycles = 456
 		gpu.LY = 0
-		gpu.STAT.mode = MODE1
+		gpu.STAT.mode = MODE0
 	}
 }
 
@@ -478,31 +477,37 @@ func (gpu *GPU) generateSpriteScanline() [160]*pixelAttributes {
 }
 
 func (gpu *GPU) renderScanline() {
-	var scanline [2][160]*pixelAttributes
 	if gpu.backgroundEnabled {
+
+		var scanline [2][160]*pixelAttributes
 		scanline[0] = gpu.generateTileScanline()
-	}
 
-	if gpu.spriteEnabled {
-		scanline[1] = gpu.generateSpriteScanline()
-	}
-
-	for x := 0; x < 160; x++ {
-		var pixel uint32
-		backgroundPixel := scanline[0][x]
-		spritePixel := scanline[1][x]
-
-		// If there is a sprite at this position in the scanline
-		// and the sprite priority is 0 or the background pixels
-		// colorIdentifier is 0, then the sprite is rendered on top
-		// of the background, otherwise the background is rendered.
-		if spritePixel != nil && (spritePixel.priority == 0 || backgroundPixel.colorIdentifier == 0) {
-			pixel = gpu.applyPalette(spritePixel.colorIdentifier, spritePixel.palette)
-		} else {
-			pixel = gpu.applyPalette(backgroundPixel.colorIdentifier, backgroundPixel.palette)
+		if gpu.spriteEnabled {
+			scanline[1] = gpu.generateSpriteScanline()
 		}
 
-		gpu.Window.Framebuffer[x+160*int(gpu.LY)] = pixel
+		for x := 0; x < 160; x++ {
+			var pixel uint32
+			backgroundPixel := scanline[0][x]
+			spritePixel := scanline[1][x]
+
+			// If there is a sprite at this position in the scanline
+			// and the sprite priority is 0 or the background pixels
+			// colorIdentifier is 0, then the sprite is rendered on top
+			// of the background, otherwise the background is rendered.
+			if spritePixel != nil && (spritePixel.priority == 0 || backgroundPixel.colorIdentifier == 0) {
+				pixel = gpu.applyPalette(spritePixel.colorIdentifier, spritePixel.palette)
+			} else {
+				pixel = gpu.applyPalette(backgroundPixel.colorIdentifier, backgroundPixel.palette)
+			}
+
+			gpu.Window.Framebuffer[x+160*int(gpu.LY)] = pixel
+		}
+	} else {
+		for x := 0; x < 160; x++ {
+			pixelFormat, _ := sdl.AllocFormat(uint(sdl.PIXELFORMAT_RGBA32))
+			gpu.Window.Framebuffer[x+160*int(gpu.LY)] = sdl.MapRGB(pixelFormat, 255, 255, 255)
+		}
 	}
 }
 

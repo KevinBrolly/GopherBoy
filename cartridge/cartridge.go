@@ -1,6 +1,9 @@
-package Gameboy
+package cartridge
 
 import (
+	"GopherBoy/mmu"
+	"GopherBoy/utils"
+
 	"io/ioutil"
 	"log"
 )
@@ -14,7 +17,7 @@ const (
 )
 
 type Cartridge struct {
-	gameboy        *Gameboy
+	mmu            *mmu.MMU
 	CartridgeData  []byte
 	ROM            []byte
 	RAM            []byte
@@ -25,14 +28,19 @@ type Cartridge struct {
 	BankingMode    int
 }
 
-func NewCartridge(gameboy *Gameboy) *Cartridge {
+func NewCartridge(mmu *mmu.MMU) *Cartridge {
 	cartridge := &Cartridge{
-		gameboy:        gameboy,
+		mmu:            mmu,
 		RAM:            make([]byte, 0x8000),
 		RAMEnabled:     false,
 		CurrentROMBank: 1,
 		BankingMode:    ROMBankingMode,
 	}
+
+	// Cartridge ROM range
+	mmu.MapMemoryRange(cartridge, 0x0000, 0x7FFF)
+	// External RAM range
+	mmu.MapMemoryRange(cartridge, 0xA000, 0xBFFF)
 
 	return cartridge
 }
@@ -133,7 +141,7 @@ func (c *Cartridge) WriteByte(addr uint16, value byte) {
 			case addr < 0x2000:
 				// If we are in MBC2, the least significant bit of the upper address byte is zero,
 				// we can enable/disable cart RAM
-				if IsBitSet(value, 4) {
+				if utils.IsBitSet(value, 4) {
 					// If the lower nibble of the value being written == 0xA then enable RAM banking
 					switch value & 0xF {
 					case 0xA:

@@ -1,4 +1,4 @@
-package Gameboy
+package ppu
 
 import (
 	"github.com/veandco/go-sdl2/sdl"
@@ -18,13 +18,12 @@ type Window struct {
 	QuitFunc    func()
 }
 
-func NewWindow(name string, width, height int, quitFunc func()) *Window {
+func NewWindow(name string, width, height int) *Window {
 	w := &Window{
 		Name:        name,
 		Width:       width,
 		Height:      height,
 		Framebuffer: make([]uint32, width*height),
-		QuitFunc:    quitFunc,
 	}
 
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {

@@ -1,8 +1,27 @@
-package Gameboy
+package cpu
 
 import (
+	"GopherBoy/mmu"
+	"GopherBoy/utils"
 	"log"
 	"os"
+)
+
+// Interrupts
+const (
+	IF = 0xFF0F
+	IE = 0xFFFF
+
+	VBLANK_INTERRUPT              = 0
+	LCDC_INTERRUPT                = 1
+	TIMER_OVERFLOW_INTERRUPT      = 2
+	SERIAL_IO_INTERRUPT           = 3
+	JOYPAD_INTERRUPT              = 4
+	VBLANK_INTERRUPT_ADDR         = 0x40
+	LCDC_INTERRUPT_ADDR           = 0x48
+	TIMER_OVERFLOW_INTERRUPT_ADDR = 0x50
+	SERIAL_IO_INTERRUPT_ADDR      = 0x58
+	JOYPAD_INTERRUPT_ADDR         = 0x60
 )
 
 type Registers struct {
@@ -17,7 +36,9 @@ type Registers struct {
 }
 
 type CPU struct {
-	gameboy            *Gameboy
+	mmu   *mmu.MMU
+	timer *Timer
+
 	Registers          Registers
 	SP                 uint16
 	PC                 uint16
@@ -30,9 +51,20 @@ type CPU struct {
 	Halt bool
 }
 
-func NewCPU(gameboy *Gameboy) *CPU {
-	cpu := &CPU{gameboy: gameboy}
+func NewCPU(mmu *mmu.MMU) *CPU {
+	cpu := &CPU{
+		mmu:   mmu,
+		timer: NewTimer(mmu),
+	}
+
+	// FF0F - IF - Interrupt Flag
+	mmu.MapMemory(cpu, IF)
+
+	// FFFF - IE - Interrupt Enable
+	mmu.MapMemory(cpu, IE)
+
 	cpu.Reset()
+
 	return cpu
 }
 
@@ -55,11 +87,11 @@ func (cpu *CPU) Reset() {
 }
 
 func (cpu *CPU) GetOpcode() byte {
-	return cpu.gameboy.ReadByte(cpu.PC)
+	return cpu.mmu.ReadByte(cpu.PC)
 }
 
 func (cpu *CPU) GetByteOffset(offset uint16) byte {
-	return cpu.gameboy.ReadByte(cpu.PC + offset)
+	return cpu.mmu.ReadByte(cpu.PC + offset)
 }
 
 func (cpu *CPU) getInstruction(opcode byte) *Instruction {
@@ -95,8 +127,6 @@ func (cpu *CPU) Step() (cycles byte) {
 		instruction := cpu.getInstruction(opcode)
 		cpu.CurrentInstruction = instruction
 
-		//fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %#x, IF: %#x, LCDC: %#x, STAT: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n", cpu.GetOpcode(), cpu.CurrentInstruction.Description, cpu.gameboy.GPU.LY, cpu.PC, cpu.SP, cpu.IME, cpu.IE, cpu.IF, cpu.gameboy.GPU.LCDC, cpu.gameboy.GPU.STAT.getStat(), JoinBytes(cpu.Registers.A, cpu.Registers.F), JoinBytes(cpu.Registers.B, cpu.Registers.C), JoinBytes(cpu.Registers.D, cpu.Registers.E), JoinBytes(cpu.Registers.H, cpu.Registers.L))
-
 		cycles = instruction.Execute(cpu)
 
 		if initialPC == cpu.PC {
@@ -107,7 +137,7 @@ func (cpu *CPU) Step() (cycles byte) {
 		cycles = 1
 	}
 
-	cpu.gameboy.Timer.Tick(cycles)
+	cpu.timer.Tick(cycles)
 	cpu.handleInterrupts()
 
 	return cycles
@@ -117,18 +147,19 @@ func (cpu *CPU) handleInterrupts() {
 	if cpu.IME {
 		// if and interrupt is requested (IF) & enabled (IE) then set its bit to 1 in interrupts
 		interrupts := cpu.IE & cpu.IF
+
 		// If an interrupt is actionable interrupts will be > 0
 		if interrupts != 0 {
 			switch {
-			case IsBitSet(interrupts, VBLANK_INTERRUPT):
+			case utils.IsBitSet(interrupts, VBLANK_INTERRUPT):
 				cpu.handleInterrupt(VBLANK_INTERRUPT, VBLANK_INTERRUPT_ADDR)
-			case IsBitSet(interrupts, LCDC_INTERRUPT):
+			case utils.IsBitSet(interrupts, LCDC_INTERRUPT):
 				cpu.handleInterrupt(LCDC_INTERRUPT, LCDC_INTERRUPT_ADDR)
-			case IsBitSet(interrupts, TIMER_OVERFLOW_INTERRUPT):
+			case utils.IsBitSet(interrupts, TIMER_OVERFLOW_INTERRUPT):
 				cpu.handleInterrupt(TIMER_OVERFLOW_INTERRUPT, TIMER_OVERFLOW_INTERRUPT_ADDR)
-			case IsBitSet(interrupts, SERIAL_IO_INTERRUPT):
+			case utils.IsBitSet(interrupts, SERIAL_IO_INTERRUPT):
 				cpu.handleInterrupt(SERIAL_IO_INTERRUPT, SERIAL_IO_INTERRUPT_ADDR)
-			case IsBitSet(interrupts, JOYPAD_INTERRUPT):
+			case utils.IsBitSet(interrupts, JOYPAD_INTERRUPT):
 				cpu.handleInterrupt(JOYPAD_INTERRUPT, JOYPAD_INTERRUPT_ADDR)
 			}
 		}
@@ -137,20 +168,46 @@ func (cpu *CPU) handleInterrupts() {
 
 func (cpu *CPU) handleInterrupt(interrupt byte, interrupt_addr uint16) {
 	cpu.IME = false
-	cpu.gameboy.WriteByte(IF, ClearBit(cpu.IF, interrupt))
+	cpu.mmu.WriteByte(IF, utils.ClearBit(cpu.IF, interrupt))
 	cpu.pushWordToStack(cpu.PC)
 	cpu.PC = interrupt_addr
 }
 
 // FLAGS
 func (cpu *CPU) SetFlag(flag byte) {
-	cpu.Registers.F = SetBit(cpu.Registers.F, flag)
+	cpu.Registers.F = utils.SetBit(cpu.Registers.F, flag)
 }
 
 func (cpu *CPU) IsFlagSet(flag byte) bool {
-	return IsBitSet(cpu.Registers.F, flag)
+	return utils.IsBitSet(cpu.Registers.F, flag)
 }
 
 func (cpu *CPU) ResetFlag(flag byte) {
-	cpu.Registers.F = ClearBit(cpu.Registers.F, flag)
+	cpu.Registers.F = utils.ClearBit(cpu.Registers.F, flag)
+}
+
+func (cpu *CPU) ReadByte(addr uint16) byte {
+	switch {
+	// I/O control handling
+	case addr == IF:
+		return cpu.IF
+	case addr == IE:
+		return cpu.IE
+	}
+	return 0
+}
+
+func (cpu *CPU) WriteByte(addr uint16, value byte) {
+	switch {
+	// I/O control handling
+	case addr == IF:
+		if cpu.Halt {
+			if value != cpu.IF {
+				cpu.Halt = false
+			}
+		}
+		cpu.IF = value
+	case addr == IE:
+		cpu.IE = value
+	}
 }

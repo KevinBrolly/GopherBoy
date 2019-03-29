@@ -1,4 +1,4 @@
-package Gameboy
+package utils
 
 //Joins two bytes together to form a 16 bit integer
 func JoinBytes(hb, lb byte) uint16 {

@@ -1,7 +1,22 @@
-package Gameboy
+package cpu
+
+import (
+	"GopherBoy/mmu"
+	"GopherBoy/utils"
+)
+
+//  Timer and Divider Registers
+const (
+	DIV  = 0xFF04
+	TIMA = 0xFF05
+	TMA  = 0xFF06
+	TAC  = 0xFF07
+
+	TIMER_STOP = 2
+)
 
 type Timer struct {
-	gameboy *Gameboy
+	mmu *mmu.MMU
 
 	DIV  byte // Divider
 	TIMA byte // Timer Counter
@@ -12,8 +27,15 @@ type Timer struct {
 	timerCounter   int
 }
 
-func NewTimer(gameboy *Gameboy) *Timer {
-	timer := &Timer{gameboy: gameboy}
+func NewTimer(mmu *mmu.MMU) *Timer {
+	timer := &Timer{mmu: mmu}
+
+	// 0xFF04 - DIV - Divider Register
+	// 0xFF05 - TIMA - Timer counter
+	// 0xFF06 - TMA - Timer Modulo
+	// 0xFF07 - TAC - Timer Control
+	mmu.MapMemoryRange(timer, 0xFF04, 0xFF07)
+
 	timer.Reset()
 	return timer
 }
@@ -30,7 +52,7 @@ func (timer *Timer) Reset() {
 func (timer *Timer) Tick(cycles byte) {
 	timer.updateDividerRegister(cycles)
 
-	if IsBitSet(timer.TAC, TIMER_STOP) {
+	if utils.IsBitSet(timer.TAC, TIMER_STOP) {
 
 		timer.timerCounter += int(cycles)
 
@@ -62,7 +84,7 @@ func (timer *Timer) Tick(cycles byte) {
 			// If timer is about to overflow
 			if timer.TIMA == 255 {
 				timer.TIMA = timer.TMA
-				timer.gameboy.requestInterrupt(TIMER_OVERFLOW_INTERRUPT)
+				timer.mmu.RequestInterrupt(TIMER_OVERFLOW_INTERRUPT)
 			} else {
 				timer.TIMA = timer.TIMA + 1
 			}

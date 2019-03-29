@@ -1,6 +1,15 @@
-package Gameboy
+package control
+
+import (
+	"GopherBoy/mmu"
+	"GopherBoy/utils"
+)
 
 const (
+	P1 = 0xFF00
+
+	JOYPAD_INTERRUPT = 4
+
 	SELECT_BUTTON_KEYS    = 5
 	SELECT_DIRECTION_KEYS = 4
 
@@ -15,41 +24,44 @@ const (
 )
 
 type Controller struct {
-	gameboy         *Gameboy
+	mmu             *mmu.MMU
 	controllerState byte
 	P1              byte
 }
 
-func NewController(gameboy *Gameboy) *Controller {
+func NewController(mmu *mmu.MMU) *Controller {
 	controller := &Controller{
-		gameboy:         gameboy,
+		mmu:             mmu,
 		controllerState: 0xFF,
 		P1:              0xFF,
 	}
+
+	// P1 = 0xFF00
+	mmu.MapMemoryRange(controller, P1, P1)
 	return controller
 }
 
 func (c *Controller) KeyPressed(key byte) {
 	// Clear the bit for the pressed key
-	c.controllerState = ClearBit(c.controllerState, key)
+	c.controllerState = utils.ClearBit(c.controllerState, key)
 
 	switch key {
 	case RIGHT, LEFT, UP, DOWN:
 		// If the game is interested in direction keys and one was pressed trigger interrupt
-		if !IsBitSet(c.P1, SELECT_DIRECTION_KEYS) {
-			c.gameboy.requestInterrupt(JOYPAD_INTERRUPT)
+		if !utils.IsBitSet(c.P1, SELECT_DIRECTION_KEYS) {
+			c.mmu.RequestInterrupt(JOYPAD_INTERRUPT)
 		}
 	case A, B, SELECT, START:
 		// If the game is interested in button keys and one was pressed trigger interrupt
-		if !IsBitSet(c.P1, SELECT_BUTTON_KEYS) {
-			c.gameboy.requestInterrupt(JOYPAD_INTERRUPT)
+		if !utils.IsBitSet(c.P1, SELECT_BUTTON_KEYS) {
+			c.mmu.RequestInterrupt(JOYPAD_INTERRUPT)
 		}
 	}
 }
 
 func (c *Controller) KeyReleased(key byte) {
 	// Set the bit for the released key
-	c.controllerState = SetBit(c.controllerState, key)
+	c.controllerState = utils.SetBit(c.controllerState, key)
 }
 
 func (c *Controller) getControllerState() byte {
@@ -57,10 +69,10 @@ func (c *Controller) getControllerState() byte {
 	p1 := c.P1 & 0xFF
 
 	switch {
-	case !IsBitSet(p1, SELECT_DIRECTION_KEYS):
+	case !utils.IsBitSet(p1, SELECT_DIRECTION_KEYS):
 		return c.P1 ^ (c.controllerState & 0xf)
 
-	case !IsBitSet(p1, SELECT_BUTTON_KEYS):
+	case !utils.IsBitSet(p1, SELECT_BUTTON_KEYS):
 		return c.P1 ^ ((c.controllerState >> 4) & 0xF)
 
 	default:

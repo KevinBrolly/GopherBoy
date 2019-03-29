@@ -1,4 +1,6 @@
-package Gameboy
+package cpu
+
+import "GopherBoy/utils"
 
 type Instruction struct {
 	Opcode      byte
@@ -431,7 +433,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.ADD_s(cpu.Registers.L, 1)
 	}},
 	0x86: &Instruction{0x86, "ADD A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.ADD_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.ADD_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0x87: &Instruction{0x87, "ADD A,A", 1, func(cpu *CPU) byte {
 		return cpu.ADD_s(cpu.Registers.A, 1)
@@ -455,7 +457,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.ADC_A_s(cpu.Registers.L, 1)
 	}},
 	0x8E: &Instruction{0x8E, "ADC A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.ADC_A_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.ADC_A_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0x8F: &Instruction{0x8F, "ADC A,A", 1, func(cpu *CPU) byte {
 		return cpu.ADC_A_s(cpu.Registers.A, 1)
@@ -479,7 +481,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.SUB_s(cpu.Registers.L, 1)
 	}},
 	0x96: &Instruction{0x96, "SUB A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.SUB_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.SUB_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0x97: &Instruction{0x97, "SUB A,A", 1, func(cpu *CPU) byte {
 		return cpu.SUB_s(cpu.Registers.A, 1)
@@ -503,7 +505,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.SBC_s(cpu.Registers.L, 1)
 	}},
 	0x9E: &Instruction{0x9E, "SBC A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.SBC_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.SBC_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0x9F: &Instruction{0x9F, "SBC A,A", 1, func(cpu *CPU) byte {
 		return cpu.SBC_s(cpu.Registers.A, 1)
@@ -527,7 +529,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.AND_s(cpu.Registers.L, 1)
 	}},
 	0xA6: &Instruction{0xA6, "AND A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.AND_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.AND_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0xA7: &Instruction{0xA7, "AND A,A", 1, func(cpu *CPU) byte {
 		return cpu.AND_s(cpu.Registers.A, 1)
@@ -551,7 +553,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.XOR_s(cpu.Registers.L, 1)
 	}},
 	0xAE: &Instruction{0xAE, "XOR A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.XOR_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.XOR_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0xAF: &Instruction{0xAF, "XOR A,A", 1, func(cpu *CPU) byte {
 		return cpu.XOR_s(cpu.Registers.A, 1)
@@ -575,7 +577,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.OR_s(cpu.Registers.L, 1)
 	}},
 	0xB6: &Instruction{0xB6, "OR A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.OR_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.OR_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0xB7: &Instruction{0xB7, "OR A,A", 1, func(cpu *CPU) byte {
 		return cpu.OR_s(cpu.Registers.A, 1)
@@ -599,7 +601,7 @@ var Instructions map[byte]*Instruction = map[byte]*Instruction{
 		return cpu.CP_s(cpu.Registers.L, 1)
 	}},
 	0xBE: &Instruction{0xBE, "CP A,(HL)", 1, func(cpu *CPU) byte {
-		return cpu.CP_s(cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
+		return cpu.CP_s(cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)), 2)
 	}},
 	0xBF: &Instruction{0xBF, "CP A,A", 1, func(cpu *CPU) byte {
 		return cpu.CP_s(cpu.Registers.A, 1)
@@ -1550,115 +1552,115 @@ func (cpu *CPU) LD_r_n(register *byte) (cycles byte) {
 
 // LD r,(HL) | 2 | ---- | r=(HL)
 func (cpu *CPU) LD_r_HL(register *byte) (cycles byte) {
-	*register = cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.H, cpu.Registers.L))
+	*register = cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L))
 	return 2
 }
 
 // LD (HL),r | 2 | ---- | (HL)=r
 func (cpu *CPU) LD_HL_r(register *byte) (cycles byte) {
-	cpu.gameboy.WriteByte(JoinBytes(cpu.Registers.H, cpu.Registers.L), *register)
+	cpu.mmu.WriteByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L), *register)
 	return 2
 }
 
 // LD (HL),n | 3 | ---- | (HL)=n
 func (cpu *CPU) LD_HL_n() (cycles byte) {
-	cpu.gameboy.WriteByte(JoinBytes(cpu.Registers.H, cpu.Registers.L), cpu.GetByteOffset(1))
+	cpu.mmu.WriteByte(utils.JoinBytes(cpu.Registers.H, cpu.Registers.L), cpu.GetByteOffset(1))
 	return 3
 }
 
 // LD A,(BC) | 2 | ---- | A=(BC)
 func (cpu *CPU) LD_A_BC() (cycles byte) {
-	cpu.Registers.A = cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.B, cpu.Registers.C))
+	cpu.Registers.A = cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.B, cpu.Registers.C))
 	return 2
 }
 
 // LD A,(DE) | 2 | ---- | A=(DE)
 func (cpu *CPU) LD_A_DE() (cycles byte) {
-	cpu.Registers.A = cpu.gameboy.ReadByte(JoinBytes(cpu.Registers.D, cpu.Registers.E))
+	cpu.Registers.A = cpu.mmu.ReadByte(utils.JoinBytes(cpu.Registers.D, cpu.Registers.E))
 	return 2
 }
 
 // LD A,(C) | 2 | ---- | A=(0xFF00+C)
 func (cpu *CPU) LD_A_C() (cycles byte) {
-	cpu.Registers.A = cpu.gameboy.ReadByte(uint16(0xFF00 + uint16(cpu.Registers.C)))
+	cpu.Registers.A = cpu.mmu.ReadByte(uint16(0xFF00 + uint16(cpu.Registers.C)))
 	return 2
 }
 
 // LD (C),A | 2 | ---- | (0xFF00+C)=A
 func (cpu *CPU) LD_C_A() (cycles byte) {
-	cpu.gameboy.WriteByte(uint16(0xFF00+uint16(cpu.Registers.C)), cpu.Registers.A)
+	cpu.mmu.WriteByte(uint16(0xFF00+uint16(cpu.Registers.C)), cpu.Registers.A)
 	return 2
 }
 
 // LDH A,(n) | 3 | ---- | A=(n)
 func (cpu *CPU) LDH_A_n() (cycles byte) {
-	cpu.Registers.A = cpu.gameboy.ReadByte(uint16(0xFF00 + uint16(cpu.GetByteOffset(1))))
+	cpu.Registers.A = cpu.mmu.ReadByte(uint16(0xFF00 + uint16(cpu.GetByteOffset(1))))
 	return 3
 }
 
 // LDH (n),A | 3 | ---- | (n)=A
 func (cpu *CPU) LDH_n_A() (cycles byte) {
-	cpu.gameboy.WriteByte(uint16(0xFF00+uint16(cpu.GetByteOffset(1))), cpu.Registers.A)
+	cpu.mmu.WriteByte(uint16(0xFF00+uint16(cpu.GetByteOffset(1))), cpu.Registers.A)
 	return 3
 }
 
 // LD A,(nn) | 4 | ---- | A=(nn)
 func (cpu *CPU) LD_A_nn() (cycles byte) {
-	cpu.Registers.A = cpu.gameboy.ReadByte(JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1)))
+	cpu.Registers.A = cpu.mmu.ReadByte(utils.JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1)))
 	return 4
 }
 
 // LD (nn),A | 4 | ---- | (nn)=A
 func (cpu *CPU) LD_nn_A() (cycles byte) {
-	cpu.gameboy.WriteByte(JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1)), cpu.Registers.A)
+	cpu.mmu.WriteByte(utils.JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1)), cpu.Registers.A)
 	return 4
 }
 
 // LD A,(HLI) | 2 | ---- | A=(HL) HL=HL+1
 func (cpu *CPU) LD_A_HLI() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	cpu.Registers.A = cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	cpu.Registers.A = cpu.mmu.ReadByte(HL)
 	HL += 1
-	cpu.Registers.H, cpu.Registers.L = SplitBytes(HL)
+	cpu.Registers.H, cpu.Registers.L = utils.SplitBytes(HL)
 	return 2
 }
 
 // LD A,(HLD) | 2 | ---- | A=(HL) HL=HL-1
 func (cpu *CPU) LD_A_HLD() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	cpu.Registers.A = cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	cpu.Registers.A = cpu.mmu.ReadByte(HL)
 	HL -= 1
-	cpu.Registers.H, cpu.Registers.L = SplitBytes(HL)
+	cpu.Registers.H, cpu.Registers.L = utils.SplitBytes(HL)
 	return 2
 }
 
 // LD (BC),A | 2 | ---- | (BC)=A
 func (cpu *CPU) LD_BC_A() (cycles byte) {
-	cpu.gameboy.WriteByte(JoinBytes(cpu.Registers.B, cpu.Registers.C), cpu.Registers.A)
+	cpu.mmu.WriteByte(utils.JoinBytes(cpu.Registers.B, cpu.Registers.C), cpu.Registers.A)
 	return 2
 }
 
 // LD (DE),A | 2 | ---- | (DE)=A
 func (cpu *CPU) LD_DE_A() (cycles byte) {
-	cpu.gameboy.WriteByte(JoinBytes(cpu.Registers.D, cpu.Registers.E), cpu.Registers.A)
+	cpu.mmu.WriteByte(utils.JoinBytes(cpu.Registers.D, cpu.Registers.E), cpu.Registers.A)
 	return 2
 }
 
 // LD (HLI),A | 2 | ---- | (HL)=A HL=HL+1
 func (cpu *CPU) LD_HLI_A() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	cpu.gameboy.WriteByte(HL, cpu.Registers.A)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	cpu.mmu.WriteByte(HL, cpu.Registers.A)
 	HL += 1
-	cpu.Registers.H, cpu.Registers.L = SplitBytes(HL)
+	cpu.Registers.H, cpu.Registers.L = utils.SplitBytes(HL)
 	return 2
 }
 
 // LD (HLD),A | 2 | ---- | (HL)=A HL=HL-1
 func (cpu *CPU) LD_HLD_A() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	cpu.gameboy.WriteByte(HL, cpu.Registers.A)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	cpu.mmu.WriteByte(HL, cpu.Registers.A)
 	HL -= 1
-	cpu.Registers.H, cpu.Registers.L = SplitBytes(HL)
+	cpu.Registers.H, cpu.Registers.L = utils.SplitBytes(HL)
 	return 2
 }
 
@@ -1673,31 +1675,31 @@ func (cpu *CPU) LD_rr_nn(r1 *byte, r2 *byte) (cycles byte) {
 
 // LD SP,nn | 3 | ---- | SP=nn
 func (cpu *CPU) LD_SP_nn() (cycles byte) {
-	cpu.SP = JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
+	cpu.SP = utils.JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
 	return 3
 }
 
 // LD SP,HL | 2 | ---- | SP=HL
 func (cpu *CPU) LD_SP_HL() (cycles byte) {
-	cpu.SP = JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	cpu.SP = utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
 	return 2
 }
 
 // PUSH qq | 4 | ---- | (SP-1)=qqH (SP-2)=qqL SP=SP-2
 func (cpu *CPU) PUSH_qq(r1 *byte, r2 *byte) (cycles byte) {
-	cpu.pushWordToStack(JoinBytes(*r1, *r2))
+	cpu.pushWordToStack(utils.JoinBytes(*r1, *r2))
 	return 4
 }
 
 // POP qq | 3 | ---- | qqL=(SP) qqH=(SP+1) SP=SP+2
 func (cpu *CPU) POP_qq(r1 *byte, r2 *byte) (cycles byte) {
-	*r1, *r2 = SplitBytes(cpu.popWordFromStack())
+	*r1, *r2 = utils.SplitBytes(cpu.popWordFromStack())
 	return 3
 }
 
 // POP AF | 3 | **** | qqL=(SP) qqH=(SP+1) SP=SP+2
 func (cpu *CPU) POP_AF() (cycles byte) {
-	cpu.Registers.A, cpu.Registers.F = SplitBytes(cpu.popWordFromStack())
+	cpu.Registers.A, cpu.Registers.F = utils.SplitBytes(cpu.popWordFromStack())
 	// Since F only holds 4 bits/flags, we mask to ensure only bits 4-7 are set
 	cpu.Registers.F &= 0xF0
 	return 3
@@ -1705,16 +1707,16 @@ func (cpu *CPU) POP_AF() (cycles byte) {
 
 // LDHL SP,e | 3 | **00 | HL=SP+e
 func (cpu *CPU) LD_HL_SP_e() (cycles byte) {
-	cpu.Registers.H, cpu.Registers.L = SplitBytes(cpu.addSignedByte(cpu.SP, int8(cpu.GetByteOffset(1))))
+	cpu.Registers.H, cpu.Registers.L = utils.SplitBytes(cpu.addSignedByte(cpu.SP, int8(cpu.GetByteOffset(1))))
 	return 3
 }
 
 // LD (nn),SP | 5 | ---- | (nn)=SPL (nn+1)==SPH
 func (cpu *CPU) LD_nn_SP() (cycles byte) {
-	hb, lb := SplitBytes(cpu.SP)
-	nn := JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
-	cpu.gameboy.WriteByte(nn, lb)
-	cpu.gameboy.WriteByte(nn+1, hb)
+	hb, lb := utils.SplitBytes(cpu.SP)
+	nn := utils.JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
+	cpu.mmu.WriteByte(nn, lb)
+	cpu.mmu.WriteByte(nn+1, hb)
 	return 5
 }
 
@@ -1809,9 +1811,9 @@ func (cpu *CPU) INC_r(r *byte) (cycles byte) {
 
 // INC (HL) | 3 | -*0* | (HL)=(HL)+1
 func (cpu *CPU) INC_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
-	cpu.gameboy.WriteByte(HL, cpu.incByte(value))
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
+	cpu.mmu.WriteByte(HL, cpu.incByte(value))
 	return 3
 }
 
@@ -1823,9 +1825,9 @@ func (cpu *CPU) DEC_r(r *byte) (cycles byte) {
 
 // DEC (HL) | 3 | -*1* | (HL)=(HL)-1
 func (cpu *CPU) DEC_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
-	cpu.gameboy.WriteByte(HL, cpu.decByte(value))
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
+	cpu.mmu.WriteByte(HL, cpu.decByte(value))
 	return 3
 }
 
@@ -1833,16 +1835,16 @@ func (cpu *CPU) DEC_HL() (cycles byte) {
 
 // ADD HL,rr | 2 | **0- | HL=HL+rr
 func (cpu *CPU) ADD_HL_rr(r1 *byte, r2 *byte) (cycles byte) {
-	ss := JoinBytes(*r1, *r2)
+	ss := utils.JoinBytes(*r1, *r2)
 
-	cpu.Registers.H, cpu.Registers.L = SplitBytes(cpu.addHL_rr(ss))
+	cpu.Registers.H, cpu.Registers.L = utils.SplitBytes(cpu.addHL_rr(ss))
 
 	return 2
 }
 
 // ADD HL,SP | 2 | **0- | HL=HL+SP
 func (cpu *CPU) ADD_HL_SP() (cycles byte) {
-	cpu.Registers.H, cpu.Registers.L = SplitBytes(cpu.addHL_rr(cpu.SP))
+	cpu.Registers.H, cpu.Registers.L = utils.SplitBytes(cpu.addHL_rr(cpu.SP))
 
 	return 2
 }
@@ -1856,17 +1858,17 @@ func (cpu *CPU) ADD_SP_e() (cycles byte) {
 
 // INC rr | 2 | ---- | rr=rr+1
 func (cpu *CPU) INC_rr(r1 *byte, r2 *byte) (cycles byte) {
-	var ss uint16 = JoinBytes(*r1, *r2)
+	var ss uint16 = utils.JoinBytes(*r1, *r2)
 	ss += 0x01
-	*r1, *r2 = SplitBytes(ss)
+	*r1, *r2 = utils.SplitBytes(ss)
 	return 2
 }
 
 // DEC rr | 2 | ---- | rr=rr-1
 func (cpu *CPU) DEC_rr(r1 *byte, r2 *byte) (cycles byte) {
-	var rr uint16 = JoinBytes(*r1, *r2)
+	var rr uint16 = utils.JoinBytes(*r1, *r2)
 	rr -= 0x01
-	*r1, *r2 = SplitBytes(rr)
+	*r1, *r2 = utils.SplitBytes(rr)
 	return 2
 }
 
@@ -1924,10 +1926,10 @@ func (cpu *CPU) RLC_r(r *byte) (cycles byte) {
 
 // RLC (HL) | 4 | *00* | (HL)<<1 (HL)0=(HL)7 CY=(HL)7
 func (cpu *CPU) RLC_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.rotateLeft(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -1939,10 +1941,10 @@ func (cpu *CPU) RL_r(r *byte) (cycles byte) {
 
 // RL (HL) | 4 | *00* | (HL)<<1 (HL)0=CY CY=(HL)7
 func (cpu *CPU) RL_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.rotateLeftThroughCarry(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -1954,10 +1956,10 @@ func (cpu *CPU) RRC_r(r *byte) (cycles byte) {
 
 // RRC (HL) | 4 | *00* | (HL)>>1 (HL)7=(HL)0 CY=(HL)0
 func (cpu *CPU) RRC_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.rotateRight(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -1969,10 +1971,10 @@ func (cpu *CPU) RR_r(r *byte) (cycles byte) {
 
 // RR (HL) | 4 | *00* | (HL)>>1 (HL)7=CY CY=(HL)0
 func (cpu *CPU) RR_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.rotateRightThroughCarry(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -1984,10 +1986,10 @@ func (cpu *CPU) SLA_r(r *byte) (cycles byte) {
 
 // SLA (HL) | 4 | *00* | (HL)<<1 CY=(HL)7
 func (cpu *CPU) SLA_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.shiftLeftArithmetic(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -1999,10 +2001,10 @@ func (cpu *CPU) SRA_r(r *byte) (cycles byte) {
 
 // SRA (HL) | 4 | *00* | (HL)>>1 (HL)7=(HL)7 CY=(HL)0
 func (cpu *CPU) SRA_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.shiftRightArithmetic(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -2014,10 +2016,10 @@ func (cpu *CPU) SRL_r(r *byte) (cycles byte) {
 
 // SRL (HL) | 4 | *00* | (HL)>>1 CY=(HL)0
 func (cpu *CPU) SRL_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.shiftRightLogical(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -2029,10 +2031,10 @@ func (cpu *CPU) SWAP_r(r *byte) (cycles byte) {
 
 // SWAP (HL) | 4 | 000* | (HL)=(HL)[4:7]&(HL)[0:3]
 func (cpu *CPU) SWAP_HL() (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	value := cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	value := cpu.mmu.ReadByte(HL)
 	value = cpu.swapNibbles(value)
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 	return 4
 }
 
@@ -2043,7 +2045,7 @@ func (cpu *CPU) BIT_b_r(bit byte, r *byte) (cycles byte) {
 	cpu.SetFlag(H)
 	cpu.ResetFlag(N)
 
-	if IsBitSet(*r, bit) {
+	if utils.IsBitSet(*r, bit) {
 		cpu.ResetFlag(Z)
 	} else {
 		cpu.SetFlag(Z)
@@ -2053,52 +2055,52 @@ func (cpu *CPU) BIT_b_r(bit byte, r *byte) (cycles byte) {
 
 // BIT b,(HL) | 3 | -10* | Z=^(HL)b
 func (cpu *CPU) BIT_b_HL(bit byte) (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
-	var value byte = cpu.gameboy.ReadByte(HL)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	var value byte = cpu.mmu.ReadByte(HL)
 
 	cpu.SetFlag(H)
 	cpu.ResetFlag(N)
 
-	if IsBitSet(value, bit) {
+	if utils.IsBitSet(value, bit) {
 		cpu.ResetFlag(Z)
 	} else {
 		cpu.SetFlag(Z)
 	}
 
-	cpu.gameboy.WriteByte(HL, value)
+	cpu.mmu.WriteByte(HL, value)
 
 	return 3
 }
 
 // SET b,r | 2 | ---- | rb=1
 func (cpu *CPU) SET_b_r(bit byte, r *byte) (cycles byte) {
-	*r = SetBit(*r, bit)
+	*r = utils.SetBit(*r, bit)
 	return 2
 }
 
 // SET b,(HL) | 4 | ---- | (HL)b=1
 func (cpu *CPU) SET_b_HL(bit byte) (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
 
-	var value byte = cpu.gameboy.ReadByte(HL)
+	var value byte = cpu.mmu.ReadByte(HL)
 
-	cpu.gameboy.WriteByte(HL, SetBit(value, bit))
+	cpu.mmu.WriteByte(HL, utils.SetBit(value, bit))
 	return 4
 }
 
 // RES b,r | 2 | ---- | rb=0
 func (cpu *CPU) RES_b_r(bit byte, r *byte) (cycles byte) {
-	*r = ClearBit(*r, bit)
+	*r = utils.ClearBit(*r, bit)
 	return 2
 }
 
 // RES b,(HL) | 4 | ---- | (HL)b=0
 func (cpu *CPU) RES_b_HL(bit byte) (cycles byte) {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
 
-	var value byte = cpu.gameboy.ReadByte(HL)
+	var value byte = cpu.mmu.ReadByte(HL)
 
-	cpu.gameboy.WriteByte(HL, ClearBit(value, bit))
+	cpu.mmu.WriteByte(HL, utils.ClearBit(value, bit))
 
 	return 4
 }
@@ -2107,7 +2109,7 @@ func (cpu *CPU) RES_b_HL(bit byte) (cycles byte) {
 
 // JP nn | 4 | ---- | PC=nn
 func (cpu *CPU) JP_nn() (cycles byte) {
-	cpu.PC = JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
+	cpu.PC = utils.JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
 	return 4
 }
 
@@ -2118,7 +2120,7 @@ func (cpu *CPU) JP_cc_nn(conditionCode int) (cycles byte) {
 		((conditionCode == CC_NC) && !cpu.IsFlagSet(CY)) ||
 		((conditionCode == CC_C) && cpu.IsFlagSet(CY)) {
 
-		cpu.PC = JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
+		cpu.PC = utils.JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
 
 		return 4
 	} else {
@@ -2167,7 +2169,7 @@ func (cpu *CPU) JR_cc_e(conditionCode int) (cycles byte) {
 
 // JP HL | 1 | ---- | PC=HL
 func (cpu *CPU) JP_HL() (cycles byte) {
-	cpu.PC = JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	cpu.PC = utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
 	return 1
 }
 
@@ -2177,7 +2179,7 @@ func (cpu *CPU) JP_HL() (cycles byte) {
 func (cpu *CPU) CALL() (cycles byte) {
 	nextInstruction := cpu.PC + 3
 	cpu.pushWordToStack(nextInstruction)
-	cpu.PC = JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
+	cpu.PC = utils.JoinBytes(cpu.GetByteOffset(2), cpu.GetByteOffset(1))
 	return 6
 }
 
@@ -2328,20 +2330,20 @@ func (cpu *CPU) EI() (cycles byte) {
 // UTILITIES
 
 func (cpu *CPU) pushWordToStack(word uint16) {
-	hb, lb := SplitBytes(word)
+	hb, lb := utils.SplitBytes(word)
 
-	cpu.gameboy.WriteByte(cpu.SP-1, hb)
-	cpu.gameboy.WriteByte(cpu.SP-2, lb)
+	cpu.mmu.WriteByte(cpu.SP-1, hb)
+	cpu.mmu.WriteByte(cpu.SP-2, lb)
 
 	cpu.SP -= 2
 }
 
 func (cpu *CPU) popWordFromStack() uint16 {
-	lb := cpu.gameboy.ReadByte(cpu.SP)
-	hb := cpu.gameboy.ReadByte(cpu.SP + 1)
+	lb := cpu.mmu.ReadByte(cpu.SP)
+	hb := cpu.mmu.ReadByte(cpu.SP + 1)
 	cpu.SP += 2
 
-	return JoinBytes(hb, lb)
+	return utils.JoinBytes(hb, lb)
 }
 
 func (cpu *CPU) addBytes(a byte, b byte) byte {
@@ -2410,7 +2412,7 @@ func (cpu *CPU) addBytesWithCarry(a byte, b byte) byte {
 }
 
 func (cpu *CPU) addHL_rr(rr uint16) uint16 {
-	HL := JoinBytes(cpu.Registers.H, cpu.Registers.L)
+	HL := utils.JoinBytes(cpu.Registers.H, cpu.Registers.L)
 
 	calculation := HL + rr
 
@@ -2571,9 +2573,9 @@ func (cpu *CPU) decByte(value byte) byte {
 func (cpu *CPU) rotateLeft(value byte) byte {
 	var calculation byte = value << 1
 
-	if IsBitSet(value, 7) {
+	if utils.IsBitSet(value, 7) {
 		cpu.SetFlag(CY)
-		calculation = SetBit(calculation, 0)
+		calculation = utils.SetBit(calculation, 0)
 	} else {
 		cpu.ResetFlag(CY)
 	}
@@ -2594,10 +2596,10 @@ func (cpu *CPU) rotateLeftThroughCarry(value byte) byte {
 	var calculation byte = value << 1
 
 	if cpu.IsFlagSet(CY) {
-		calculation = SetBit(calculation, 0)
+		calculation = utils.SetBit(calculation, 0)
 	}
 
-	if IsBitSet(value, 7) {
+	if utils.IsBitSet(value, 7) {
 		cpu.SetFlag(CY)
 	} else {
 		cpu.ResetFlag(CY)
@@ -2618,9 +2620,9 @@ func (cpu *CPU) rotateLeftThroughCarry(value byte) byte {
 func (cpu *CPU) rotateRight(value byte) byte {
 	var calculation byte = value >> 1
 
-	if IsBitSet(value, 0) {
+	if utils.IsBitSet(value, 0) {
 		cpu.SetFlag(CY)
-		calculation = SetBit(calculation, 7)
+		calculation = utils.SetBit(calculation, 7)
 	} else {
 		cpu.ResetFlag(CY)
 	}
@@ -2641,10 +2643,10 @@ func (cpu *CPU) rotateRightThroughCarry(value byte) byte {
 	var calculation byte = value >> 1
 
 	if cpu.IsFlagSet(CY) {
-		calculation = SetBit(calculation, 7)
+		calculation = utils.SetBit(calculation, 7)
 	}
 
-	if IsBitSet(value, 0) {
+	if utils.IsBitSet(value, 0) {
 		cpu.SetFlag(CY)
 	} else {
 		cpu.ResetFlag(CY)
@@ -2665,7 +2667,7 @@ func (cpu *CPU) rotateRightThroughCarry(value byte) byte {
 func (cpu *CPU) shiftLeftArithmetic(value byte) byte {
 	var calculation byte = value << 1
 
-	if IsBitSet(value, 7) {
+	if utils.IsBitSet(value, 7) {
 		cpu.SetFlag(CY)
 	} else {
 		cpu.ResetFlag(CY)
@@ -2686,7 +2688,7 @@ func (cpu *CPU) shiftLeftArithmetic(value byte) byte {
 func (cpu *CPU) shiftRightLogical(value byte) byte {
 	var calculation byte = value >> 1
 
-	if IsBitSet(value, 0) {
+	if utils.IsBitSet(value, 0) {
 		cpu.SetFlag(CY)
 	} else {
 		cpu.ResetFlag(CY)
@@ -2707,13 +2709,13 @@ func (cpu *CPU) shiftRightLogical(value byte) byte {
 func (cpu *CPU) shiftRightArithmetic(value byte) byte {
 	var calculation byte = value >> 1
 
-	if IsBitSet(value, 7) {
-		calculation = SetBit(calculation, 7)
+	if utils.IsBitSet(value, 7) {
+		calculation = utils.SetBit(calculation, 7)
 	} else {
-		calculation = ClearBit(calculation, 7)
+		calculation = utils.ClearBit(calculation, 7)
 	}
 
-	if IsBitSet(value, 0) {
+	if utils.IsBitSet(value, 0) {
 		cpu.SetFlag(CY)
 	} else {
 		cpu.ResetFlag(CY)
@@ -2732,7 +2734,7 @@ func (cpu *CPU) shiftRightArithmetic(value byte) byte {
 }
 
 func (cpu *CPU) swapNibbles(value byte) byte {
-	var calculation byte = SwapNibbles(value)
+	var calculation byte = utils.SwapNibbles(value)
 
 	cpu.ResetFlag(CY)
 	cpu.ResetFlag(H)

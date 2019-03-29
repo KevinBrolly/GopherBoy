@@ -1,7 +1,7 @@
 package main
 
 import (
-	"GopherBoy/Gameboy"
+	"GopherBoy/gameboy"
 	"os"
 	"runtime"
 )
@@ -9,7 +9,7 @@ import (
 func main() {
 	runtime.LockOSThread()
 
-	gameboy := Gameboy.NewGameboy()
+	gameboy := gameboy.NewGameboy()
 
 	rom := os.Args[1]
 	gameboy.Cartridge.LoadCartridgeData(rom)

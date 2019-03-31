@@ -106,13 +106,13 @@ func (gameboy *Gameboy) Run() {
 						gameboy.Controller.KeyPressed(control.UP)
 					case sdl.K_DOWN:
 						gameboy.Controller.KeyPressed(control.DOWN)
-					case sdl.K_a:
+					case sdl.K_s:
 						gameboy.Controller.KeyPressed(control.A)
-					case sdl.K_b:
+					case sdl.K_a:
 						gameboy.Controller.KeyPressed(control.B)
-					case sdl.K_RETURN:
-						gameboy.Controller.KeyPressed(control.SELECT)
 					case sdl.K_SPACE:
+						gameboy.Controller.KeyPressed(control.SELECT)
+					case sdl.K_RETURN:
 						gameboy.Controller.KeyPressed(control.START)
 
 					}
@@ -126,13 +126,13 @@ func (gameboy *Gameboy) Run() {
 						gameboy.Controller.KeyReleased(control.UP)
 					case sdl.K_DOWN:
 						gameboy.Controller.KeyReleased(control.DOWN)
-					case sdl.K_a:
+					case sdl.K_s:
 						gameboy.Controller.KeyReleased(control.A)
-					case sdl.K_b:
+					case sdl.K_a:
 						gameboy.Controller.KeyReleased(control.B)
-					case sdl.K_RETURN:
-						gameboy.Controller.KeyReleased(control.SELECT)
 					case sdl.K_SPACE:
+						gameboy.Controller.KeyReleased(control.SELECT)
+					case sdl.K_RETURN:
 						gameboy.Controller.KeyReleased(control.START)
 
 					}

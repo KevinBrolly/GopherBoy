@@ -480,10 +480,10 @@ func (ppu *PPU) generateSpriteScanline() [160]*pixelAttributes {
 
 				var colorIdentifier byte
 				if utils.IsBitSet(data1, byte(pixelBit)) {
-					colorIdentifier = utils.SetBit(colorIdentifier, 1)
+					colorIdentifier = utils.SetBit(colorIdentifier, 0)
 				}
 				if utils.IsBitSet(data2, byte(pixelBit)) {
-					colorIdentifier = utils.SetBit(colorIdentifier, 0)
+					colorIdentifier = utils.SetBit(colorIdentifier, 1)
 				}
 
 				pixel := int(xPos) + (7 - tilePixel)
@@ -564,10 +564,10 @@ func (ppu *PPU) getTileColorIdentifierForPixel(tileMap uint16, pixelX byte, pixe
 
 	var colorIdentifier byte
 	if utils.IsBitSet(data1, byte(pixelBit)) {
-		colorIdentifier = utils.SetBit(colorIdentifier, 1)
+		colorIdentifier = utils.SetBit(colorIdentifier, 0)
 	}
 	if utils.IsBitSet(data2, byte(pixelBit)) {
-		colorIdentifier = utils.SetBit(colorIdentifier, 0)
+		colorIdentifier = utils.SetBit(colorIdentifier, 1)
 	}
 
 	return colorIdentifier
@@ -630,13 +630,13 @@ func (ppu *PPU) applyPalette(colorIdentifier byte, palette byte) uint32 {
 
 	switch color {
 	case 0:
-		return sdl.MapRGB(pixelFormat, 255, 255, 255)
+		return sdl.MapRGB(pixelFormat, 224, 248, 208)
 	case 1:
-		return sdl.MapRGB(pixelFormat, 192, 192, 192)
+		return sdl.MapRGB(pixelFormat, 136, 192, 112)
 	case 2:
-		return sdl.MapRGB(pixelFormat, 96, 96, 96)
+		return sdl.MapRGB(pixelFormat, 52, 104, 86)
 	case 3:
-		return sdl.MapRGB(pixelFormat, 0, 0, 0)
+		return sdl.MapRGB(pixelFormat, 8, 24, 32)
 	}
 	return 0
 }

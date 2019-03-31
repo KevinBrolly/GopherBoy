@@ -428,7 +428,7 @@ func (ppu *PPU) generateTileScanline() [160]*pixelAttributes {
 		// translate the current x pos to window space if necessary
 		if windowEnabled {
 			if pixel >= ppu.WX {
-				pixelX = pixel - ppu.WX
+				pixelX = pixel - (ppu.WX - 7)
 			}
 		}
 

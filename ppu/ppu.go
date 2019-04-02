@@ -126,7 +126,7 @@ type PPU struct {
 	// LCDC Bit 0 - BG Display (for CGB see below) (0=Off, 1=On)
 	backgroundEnabled bool
 
-	Cycles uint // Number of cycles since the last LCD Status Mode Change
+	Cycles int // Number of cycles since the last LCD Status Mode Change
 }
 
 type pixelAttributes struct {
@@ -299,7 +299,7 @@ func (ppu *PPU) setLCDCFields(value byte) {
 
 func (ppu *PPU) Step(cycles byte) {
 	if ppu.lcdEnabled {
-		ppu.Cycles += uint(cycles * 4)
+		ppu.Cycles += int(cycles)
 
 		// STAT indicates the current status of the LCD controller.
 		switch ppu.STAT.mode {

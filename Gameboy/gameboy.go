@@ -8,8 +8,6 @@ import (
 	"GopherBoy/ppu"
 	"fmt"
 
-	"time"
-
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -58,12 +56,8 @@ func NewGameboy() (gameboy *Gameboy) {
 }
 
 func (gameboy *Gameboy) Run() {
-	timePerFrame := time.Second / 60
-
-	ticker := time.NewTicker(timePerFrame)
-
-	for range ticker.C {
-		MAXCYCLES := 17476
+	for {
+		MAXCYCLES := 69905
 		cyclesThisUpdate := 0
 
 		for cyclesThisUpdate < MAXCYCLES {

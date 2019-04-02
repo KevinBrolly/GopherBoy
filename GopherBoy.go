@@ -13,7 +13,7 @@ func main() {
 	gameboy := gameboy.NewGameboy()
 
 	rom := os.Args[1]
-	gameboy.Cartridge.LoadCartridgeData(rom)
+	gameboy.LoadCartridgeData(rom)
 
 	gameboy.Run()
 }

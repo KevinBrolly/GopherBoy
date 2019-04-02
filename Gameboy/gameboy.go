@@ -2,8 +2,9 @@ package gameboy
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 
-	"github.com/kevinbrolly/GopherBoy/cartridge"
 	"github.com/kevinbrolly/GopherBoy/control"
 	"github.com/kevinbrolly/GopherBoy/cpu"
 	"github.com/kevinbrolly/GopherBoy/mmu"
@@ -19,9 +20,9 @@ const (
 
 type Gameboy struct {
 	MMU        *mmu.MMU
+	MBC        mmu.Memory
 	CPU        *cpu.CPU
 	PPU        *ppu.PPU
-	Cartridge  *cartridge.Cartridge
 	Controller *control.Controller
 
 	inBootMode        bool
@@ -37,14 +38,12 @@ func NewGameboy() (gameboy *Gameboy) {
 	mmu := mmu.NewMMU()
 	cpu := cpu.NewCPU(mmu)
 	ppu := ppu.NewPPU(mmu)
-	cartridge := cartridge.NewCartridge(mmu)
 	controller := control.NewController(mmu)
 
 	gameboy = &Gameboy{
 		MMU:        mmu,
 		CPU:        cpu,
 		PPU:        ppu,
-		Cartridge:  cartridge,
 		Controller: controller,
 	}
 
@@ -54,6 +53,25 @@ func NewGameboy() (gameboy *Gameboy) {
 	mmu.MapMemoryRange(gameboy, 0xFF80, 0xFFFE)
 
 	return gameboy
+}
+
+func (gameboy *Gameboy) LoadCartridgeData(filename string) {
+	data, err := ioutil.ReadFile(filename)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch data[0x147] {
+	case 1:
+		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
+	case 2:
+		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
+	case 3:
+		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
+	case 4:
+		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
+	}
 }
 
 func (gameboy *Gameboy) Run() {

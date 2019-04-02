@@ -1,12 +1,12 @@
-package cartridge
+package mmu
 
-import (
-	"github.com/kevinbrolly/GopherBoy/mmu"
+const (
+	ROMBankingMode = 0
+	RAMBankingMode = 1
 )
 
 type MBC1 struct {
-	mmu            *mmu.MMU
-	cartridge      *Cartridge
+	mmu            *MMU
 	CartridgeData  []byte
 	ROM            []byte
 	RAM            []byte
@@ -16,10 +16,10 @@ type MBC1 struct {
 	BankingMode    int
 }
 
-func NewMBC1(mmu *mmu.MMU, cartridge *Cartridge) *MBC1 {
+func NewMBC1(mmu *MMU, data []byte) *MBC1 {
 	mbc1 := &MBC1{
 		mmu:            mmu,
-		cartridge:      cartridge,
+		CartridgeData:  data,
 		RAM:            make([]byte, 0x8000),
 		RAMEnabled:     false,
 		CurrentROMBank: 1,
@@ -37,10 +37,10 @@ func NewMBC1(mmu *mmu.MMU, cartridge *Cartridge) *MBC1 {
 func (mbc *MBC1) ReadByte(addr uint16) byte {
 	switch {
 	case addr >= 0x0000 && addr <= 0x3FFF:
-		return mbc.cartridge.CartridgeData[addr]
+		return mbc.CartridgeData[addr]
 	case addr >= 0x4000 && addr <= 0x7FFF:
 		addr := addr - 0x4000
-		return mbc.cartridge.CartridgeData[int(addr)+(int(mbc.CurrentROMBank)*0x4000)]
+		return mbc.CartridgeData[int(addr)+(int(mbc.CurrentROMBank)*0x4000)]
 	case addr >= 0xA000 && addr <= 0xBFFF:
 		addr := addr - 0xA000
 		return mbc.RAM[int(addr)+mbc.CurrentRAMBank*0x2000]

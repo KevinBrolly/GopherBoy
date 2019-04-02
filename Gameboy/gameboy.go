@@ -1,12 +1,13 @@
 package gameboy
 
 import (
-	"GopherBoy/cartridge"
-	"GopherBoy/control"
-	"GopherBoy/cpu"
-	"GopherBoy/mmu"
-	"GopherBoy/ppu"
 	"fmt"
+
+	"github.com/kevinbrolly/GopherBoy/cartridge"
+	"github.com/kevinbrolly/GopherBoy/control"
+	"github.com/kevinbrolly/GopherBoy/cpu"
+	"github.com/kevinbrolly/GopherBoy/mmu"
+	"github.com/kevinbrolly/GopherBoy/ppu"
 
 	"github.com/veandco/go-sdl2/sdl"
 )

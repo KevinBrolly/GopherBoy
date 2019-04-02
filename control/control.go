@@ -1,8 +1,8 @@
 package control
 
 import (
-	"GopherBoy/mmu"
-	"GopherBoy/utils"
+	"github.com/kevinbrolly/GopherBoy/mmu"
+	"github.com/kevinbrolly/GopherBoy/utils"
 )
 
 const (

@@ -1,10 +1,11 @@
 package Gameboy_test
 
 import (
-	"GopherBoy/Gameboy"
 	"bytes"
 	"fmt"
 	"testing"
+
+	"github.com/kevinbrolly/GopherBoy/Gameboy"
 )
 
 func compareGameboy(t *testing.T, initialGameboy *Gameboy.Gameboy, expectedGameboy *Gameboy.Gameboy) {

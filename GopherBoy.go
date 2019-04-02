@@ -1,9 +1,10 @@
 package main
 
 import (
-	"GopherBoy/gameboy"
 	"os"
 	"runtime"
+
+	"github.com/kevinbrolly/GopherBoy/gameboy"
 )
 
 func main() {

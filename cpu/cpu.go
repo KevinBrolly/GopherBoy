@@ -1,10 +1,11 @@
 package cpu
 
 import (
-	"GopherBoy/mmu"
-	"GopherBoy/utils"
 	"log"
 	"os"
+
+	"github.com/kevinbrolly/GopherBoy/mmu"
+	"github.com/kevinbrolly/GopherBoy/utils"
 )
 
 // Interrupts

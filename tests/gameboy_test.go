@@ -1,8 +1,9 @@
 package Gameboy_test
 
 import (
-	"GopherBoy/Gameboy"
 	"testing"
+
+	"github.com/kevinbrolly/GopherBoy/Gameboy"
 )
 
 func TestP1(t *testing.T) {

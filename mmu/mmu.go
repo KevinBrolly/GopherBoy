@@ -1,7 +1,7 @@
 package mmu
 
 import (
-	"GopherBoy/utils"
+	"github.com/kevinbrolly/GopherBoy/utils"
 )
 
 type Memory interface {

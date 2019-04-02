@@ -1,7 +1,7 @@
 package cartridge
 
 import (
-	"GopherBoy/mmu"
+	"github.com/kevinbrolly/GopherBoy/mmu"
 )
 
 type MBC1 struct {

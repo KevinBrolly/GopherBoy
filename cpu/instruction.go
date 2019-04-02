@@ -1,6 +1,6 @@
 package cpu
 
-import "GopherBoy/utils"
+import "github.com/kevinbrolly/GopherBoy/utils"
 
 type Instruction struct {
 	Opcode      byte

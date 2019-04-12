@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 
+	"github.com/kevinbrolly/GopherBoy/apu"
 	"github.com/kevinbrolly/GopherBoy/control"
 	"github.com/kevinbrolly/GopherBoy/cpu"
 	"github.com/kevinbrolly/GopherBoy/mmu"
@@ -23,6 +24,7 @@ type Gameboy struct {
 	MBC        mmu.Memory
 	CPU        *cpu.CPU
 	PPU        *ppu.PPU
+	APU        *apu.APU
 	Controller *control.Controller
 
 	inBootMode        bool
@@ -38,14 +40,20 @@ func NewGameboy() (gameboy *Gameboy) {
 	mmu := mmu.NewMMU()
 	cpu := cpu.NewCPU(mmu)
 	ppu := ppu.NewPPU(mmu)
+	apu := apu.NewAPU(mmu)
 	controller := control.NewController(mmu)
 
 	gameboy = &Gameboy{
 		MMU:        mmu,
 		CPU:        cpu,
 		PPU:        ppu,
+		APU:        apu,
 		Controller: controller,
 	}
+
+	// Map memory for outputting result of blargg tests
+	mmu.MapMemory(gameboy, 0xFF01)
+	mmu.MapMemory(gameboy, 0xFF02)
 
 	// Working RAM
 	mmu.MapMemoryRange(gameboy, 0xC000, 0xDFFF)
@@ -82,6 +90,7 @@ func (gameboy *Gameboy) Run() {
 		for cyclesThisUpdate < MAXCYCLES {
 			cycles := gameboy.CPU.Step()
 			gameboy.PPU.Step(cycles)
+			gameboy.APU.Tick(int(cycles))
 			cyclesThisUpdate += int(cycles)
 
 			// fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %#x, IF: %#x, LCDC: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n",
@@ -196,6 +205,7 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
 		gameboy.dmgStatusRegister = value
 
 	case addr == 0xFF01:
+		fmt.Printf("TEST")
 		gameboy.debug = value
 	case addr == 0xFF02 && value == 0x81:
 		fmt.Print(string(gameboy.ReadByte(0xFF01)))

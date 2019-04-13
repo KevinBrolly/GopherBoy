@@ -51,7 +51,7 @@ func (c *Channel3) Tick(tCycles int) {
 	if c.timer > 0 {
 		c.timer -= tCycles
 	}
-	if c.timer == 0 {
+	if c.timer <= 0 {
 		c.position++
 		if c.position == 32 {
 			c.position = 0
@@ -135,7 +135,7 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 		// Bit 6-5 - Select output level
 		c.volume = value >> 5
 	case addr == NR33:
-		c.writeHighFrequency(value)
+		c.writeFrequencyLowerBits(value)
 	case addr == NR34:
 		// Bit 7   - Initial (1=Restart Sound)
 		// Bit 6   - Counter/consecutive selection
@@ -146,7 +146,6 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 		}
 		c.lengthEnable = utils.IsBitSet(value, 6)
 
-		frequencyHighBits := uint16(value&0x3) << 8
-		c.frequency = (c.frequency & 0xFF) | frequencyHighBits
+		c.writeFrequencyHigherBits(value)
 	}
 }

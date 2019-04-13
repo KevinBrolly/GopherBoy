@@ -60,7 +60,7 @@ func (c *Channel4) Tick(tCycles int) {
 		c.timer -= tCycles
 	}
 
-	if c.timer == 0 {
+	if c.timer <= 0 {
 		// When clocked by the frequency timer, the low two bits (0 and 1)
 		// are XORed
 		bit := (c.LFSR & 0x1) ^ (c.LFSR & 0x2)

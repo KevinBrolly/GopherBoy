@@ -21,12 +21,12 @@ type Channel struct {
 }
 
 func (c *Channel) TickLength() {
-	if c.length > 0 {
+	if c.lengthEnable && c.length > 0 {
 		c.length--
-	}
 
-	if c.length == 0 && c.lengthEnable {
-		c.enable = false
+		if c.length == 0 {
+			c.enable = false
+		}
 	}
 }
 
@@ -68,12 +68,18 @@ func (c *Channel) volumeEnvelopeWriteByte(value byte) {
 	// Bit 7-4 - Initial Volume of envelope (0-0Fh) (0=No Sound)
 	// Bit 3   - Envelope Direction (0=Decrease, 1=Increase)
 	// Bit 2-0 - Number of envelope sweep (n: 0-7)
-	c.volumeEnvelopeInitial = value >> 4
+	c.volumeEnvelopeInitial = (value >> 4) & 0x0f
 	c.volumeEnvelopeDirection = utils.IsBitSet(value, 3)
-	c.volumeEnvelopePeriod = (value & 0x3)
+	c.volumeEnvelopePeriod = value & 0x7
 }
 
-func (c *Channel) writeHighFrequency(value byte) {
+func (c *Channel) writeFrequencyLowerBits(value byte) {
 	// value = lower 8 bits of 11 bit frequency. Next 3 bits are in NRx4
 	c.frequency = (c.frequency & 0x700) | uint16(value)
+}
+
+func (c *Channel) writeFrequencyHigherBits(value byte) {
+	// value = Bit 2-0 - Frequency's higher 3 bits (x) (Write Only)
+	frequencyHighBits := uint16(value&0x7) << 8
+	c.frequency = (c.frequency & 0xFF) | uint16(frequencyHighBits)
 }

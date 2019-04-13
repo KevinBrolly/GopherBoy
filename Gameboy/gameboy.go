@@ -205,7 +205,6 @@ func (gameboy *Gameboy) WriteByte(addr uint16, value byte) {
 		gameboy.dmgStatusRegister = value
 
 	case addr == 0xFF01:
-		fmt.Printf("TEST")
 		gameboy.debug = value
 	case addr == 0xFF02 && value == 0x81:
 		fmt.Print(string(gameboy.ReadByte(0xFF01)))

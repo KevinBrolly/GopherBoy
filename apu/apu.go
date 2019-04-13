@@ -69,7 +69,7 @@ func NewAPU(mmu *mmu.MMU) *APU {
 
 	spec := &sdl.AudioSpec{
 		Freq:     44100,
-		Format:   sdl.AUDIO_U8,
+		Format:   sdl.AUDIO_S16,
 		Channels: 2,
 		Samples:  1024,
 	}
@@ -144,16 +144,16 @@ func (s *APU) Tick(mCycles int) {
 			}
 		}
 
-		SO2 = SO2 * s.volumeSO2 * 8
-		SO1 = SO1 * s.volumeSO1 * 8
-
-		s.sampleBuffer[s.sampleBufferIndex] = SO2
-		s.sampleBufferIndex++
+		SO2 = SO2 * (s.volumeSO2 + 1)
+		SO1 = SO1 * (s.volumeSO1 + 1)
 
 		s.sampleBuffer[s.sampleBufferIndex] = SO1
 		s.sampleBufferIndex++
 
-		if s.sampleBufferIndex >= sampleBufferSize {
+		s.sampleBuffer[s.sampleBufferIndex] = SO2
+		s.sampleBufferIndex++
+
+		if s.sampleBufferIndex == sampleBufferSize {
 			s.sampleBufferIndex = 0
 
 			for sdl.GetQueuedAudioSize(1) > (sampleBufferSize * 4) {

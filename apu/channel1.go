@@ -77,7 +77,7 @@ func (c *Channel1) Tick(tCycles int) {
 	if c.timer > 0 {
 		c.timer -= tCycles
 	}
-	if c.timer == 0 {
+	if c.timer <= 0 {
 		// Increment position of the duty waveform
 		c.wavePatternDutyPosition++
 		if c.wavePatternDutyPosition == 8 {
@@ -193,27 +193,27 @@ func (c *Channel1) WriteByte(addr uint16, value byte) {
 		// Bit 2-0 - Number of sweep shift (n: 0-7)
 		c.sweepPeriod = (value & 0x70) >> 4
 		c.sweepNegate = utils.IsBitSet(value, 3)
-		c.sweepShift = (value & 0x3)
+		c.sweepShift = value & 0x7
 	case addr == NR11:
 		// Bit 7-6 - Wave Pattern Duty
 		// Bit 5-0 - Sound length data
-		c.wavePatternDuty = value >> 6
+		c.wavePatternDuty = (value >> 6) & 0x3
 		c.length = int(value & 0x3F)
 	case addr == NR12:
 		c.volumeEnvelopeWriteByte(value)
 	case addr == NR13:
-		c.writeHighFrequency(value)
+		c.writeFrequencyLowerBits(value)
 	case addr == NR14:
 		// Bit 7   - Initial (1=Restart Sound)
 		// Bit 6   - Counter/consecutive selection
 		// 		  (1=Stop output when length in NR11 expires)
 		// Bit 2-0 - Frequency's higher 3 bits (x)
+		c.lengthEnable = utils.IsBitSet(value, 6)
+		c.writeFrequencyHigherBits(value)
+
+		// Make sure we trigger after the lengthEnable and Higher frequency bits are set
 		if utils.IsBitSet(value, 7) {
 			c.trigger()
 		}
-		c.lengthEnable = utils.IsBitSet(value, 6)
-
-		frequencyHighBits := uint16(value&0x3) << 8
-		c.frequency = (c.frequency & 0xFF) | frequencyHighBits
 	}
 }

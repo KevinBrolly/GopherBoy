@@ -58,7 +58,7 @@ func (c *Channel2) Tick(tCycles int) {
 	if c.timer > 0 {
 		c.timer -= tCycles
 	}
-	if c.timer == 0 {
+	if c.timer <= 0 {
 		// Increment position of the duty waveform
 		c.wavePatternDutyPosition++
 		if c.wavePatternDutyPosition == 8 {
@@ -123,7 +123,7 @@ func (c *Channel2) WriteByte(addr uint16, value byte) {
 	case addr == NR22:
 		c.volumeEnvelopeWriteByte(value)
 	case addr == NR23:
-		c.writeHighFrequency(value)
+		c.writeFrequencyLowerBits(value)
 	case addr == NR24:
 		// Bit 7   - Initial (1=Restart Sound)
 		// Bit 6   - Counter/consecutive selection
@@ -134,7 +134,6 @@ func (c *Channel2) WriteByte(addr uint16, value byte) {
 		}
 		c.lengthEnable = utils.IsBitSet(value, 6)
 
-		frequencyHighBits := uint16(value&0x3) << 8
-		c.frequency = (c.frequency & 0xFF) | frequencyHighBits
+		c.writeFrequencyHigherBits(value)
 	}
 }

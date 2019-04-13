@@ -69,7 +69,7 @@ func NewAPU(mmu *mmu.MMU) *APU {
 
 	spec := &sdl.AudioSpec{
 		Freq:     44100,
-		Format:   sdl.AUDIO_S16,
+		Format:   sdl.AUDIO_U8,
 		Channels: 2,
 		Samples:  1024,
 	}
@@ -111,11 +111,6 @@ func (s *APU) Tick(mCycles int) {
 			channel2Sample := s.channel2.sample()
 			channel3Sample := s.channel3.sample()
 			channel4Sample := s.channel4.sample()
-
-			//fmt.Printf("channel1Sample: %v\n", channel1Sample)
-			//fmt.Printf("channel2Sample: %v\n", channel1Sample)
-			//fmt.Printf("channel3Sample: %v\n", channel1Sample)
-			//fmt.Printf("channel4Sample: %v\n", channel1Sample)
 
 			if s.output4SO2 {
 				SO2 += channel4Sample

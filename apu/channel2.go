@@ -118,7 +118,7 @@ func (c *Channel2) WriteByte(addr uint16, value byte) {
 	case addr == NR21:
 		// Bit 7-6 - Wave Pattern Duty
 		// Bit 5-0 - Sound length data
-		c.wavePatternDuty = value >> 6
+		c.wavePatternDuty = (value >> 6) & 0x3
 		c.length = int(value & 0x3F)
 	case addr == NR22:
 		c.volumeEnvelopeWriteByte(value)
@@ -129,11 +129,13 @@ func (c *Channel2) WriteByte(addr uint16, value byte) {
 		// Bit 6   - Counter/consecutive selection
 		// 		  (1=Stop output when length in NR11 expires)
 		// Bit 2-0 - Frequency's higher 3 bits (x)
-		if utils.IsBitSet(value, 7) {
-			c.trigger()
-		}
 		c.lengthEnable = utils.IsBitSet(value, 6)
 
 		c.writeFrequencyHigherBits(value)
+
+		// Make sure we trigger after the lengthEnable and Higher frequency bits are set
+		if utils.IsBitSet(value, 7) {
+			c.trigger()
+		}
 	}
 }

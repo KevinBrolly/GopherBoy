@@ -31,6 +31,9 @@ func NewChannel3(mmu *mmu.MMU) *Channel3 {
 	mmu.MapMemory(channel, NR33)
 	mmu.MapMemory(channel, NR34)
 
+	// wavePatternRAM
+	mmu.MapMemoryRange(channel, 0xFF30, 0xFF3F)
+
 	return channel
 }
 
@@ -122,6 +125,8 @@ func (c *Channel3) ReadByte(addr uint16) byte {
 			value = utils.SetBit(value, 6)
 		}
 		return value
+	case addr >= 0xFF30 && addr <= 0xFF3F:
+		return c.wavePatternRAM[addr&0xF]
 	}
 	return 0
 }
@@ -131,9 +136,11 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 	case addr == NR30:
 		// Bit 7 - Sound Channel 3 Off  (0=Stop, 1=Playback)
 		c.enable = utils.IsBitSet(value, 7)
+	case addr == NR31:
+		c.length = int(value)
 	case addr == NR32:
 		// Bit 6-5 - Select output level
-		c.volume = value >> 5
+		c.volume = (value >> 5) & 0x3
 	case addr == NR33:
 		c.writeFrequencyLowerBits(value)
 	case addr == NR34:
@@ -141,11 +148,16 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 		// Bit 6   - Counter/consecutive selection
 		// 		  (1=Stop output when length in NR11 expires)
 		// Bit 2-0 - Frequency's higher 3 bits (x)
-		if utils.IsBitSet(value, 7) {
-			c.trigger()
-		}
 		c.lengthEnable = utils.IsBitSet(value, 6)
 
 		c.writeFrequencyHigherBits(value)
+
+		// Make sure we trigger after the lengthEnable and Higher frequency bits are set
+		if utils.IsBitSet(value, 7) {
+			c.trigger()
+		}
+	case addr >= 0xFF30 && addr <= 0xFF3F:
+		c.wavePatternRAM[addr&0xF] = value
 	}
+
 }

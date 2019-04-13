@@ -147,10 +147,10 @@ func (s *APU) Tick(mCycles int) {
 		SO2 = SO2 * (s.volumeSO2 + 1)
 		SO1 = SO1 * (s.volumeSO1 + 1)
 
-		s.sampleBuffer[s.sampleBufferIndex] = SO1
+		s.sampleBuffer[s.sampleBufferIndex] = SO2
 		s.sampleBufferIndex++
 
-		s.sampleBuffer[s.sampleBufferIndex] = SO2
+		s.sampleBuffer[s.sampleBufferIndex] = SO1
 		s.sampleBufferIndex++
 
 		if s.sampleBufferIndex == sampleBufferSize {
@@ -162,8 +162,6 @@ func (s *APU) Tick(mCycles int) {
 
 			sdl.QueueAudio(1, s.sampleBuffer)
 		}
-
-		//sdl.QueueAudio(1, []byte{SO2, SO1})
 
 		// Reload sample timer
 		s.sampleTimer = 4194304 / 44100

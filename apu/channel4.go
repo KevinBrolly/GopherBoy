@@ -158,9 +158,11 @@ func (c *Channel4) WriteByte(addr uint16, value byte) {
 		// Bit 7   - Initial (1=Restart Sound)
 		// Bit 6   - Counter/consecutive selection
 		// 		  (1=Stop output when length in NR11 expires)
+		c.lengthEnable = utils.IsBitSet(value, 6)
+
+		// Make sure we trigger after lengthEnable is set
 		if utils.IsBitSet(value, 7) {
 			c.trigger()
 		}
-		c.lengthEnable = utils.IsBitSet(value, 6)
 	}
 }

@@ -44,7 +44,7 @@ func (c *Channel4) trigger() {
 	}
 
 	// Frequency timer is reloaded with period.
-	c.timer = 524288/c.getDividingRatio()/2 ^ (int(c.frequency) + 1)
+	c.timer = c.getDividingRatio() << c.shiftClockFrequency
 
 	// Volume envelope timer is reloaded with period.
 	c.volumeEnvelopeTimer = c.volumeEnvelopePeriod
@@ -63,34 +63,31 @@ func (c *Channel4) Tick(tCycles int) {
 	if c.timer <= 0 {
 		// When clocked by the frequency timer, the low two bits (0 and 1)
 		// are XORed
-		bit := (c.LFSR & 0x1) ^ (c.LFSR & 0x2)
+		bit := (c.LFSR & 0x1) ^ ((c.LFSR >> 1) & 0x1)
 		// All LFSR bits are shifted right by one
 		c.LFSR = c.LFSR >> 1
 		// And the result of the XOR is put into the now-empty high bit
-		if bit == 1 {
-			c.LFSR = c.LFSR | 0x4000
-		}
+		c.LFSR = c.LFSR | (bit << 14)
 		// If width mode is 1 (NR43), the XOR result is ALSO put into
 		// bit 6 AFTER the shift, resulting in a 7-bit LFSR.
 		if c.counterWidth {
-			if bit == 1 {
-				c.LFSR = c.LFSR | 0x40
-			} else {
-				c.LFSR = c.LFSR &^ 0x40
-			}
+			c.LFSR = c.LFSR &^ 0x40
+			c.LFSR = c.LFSR | (bit << 6)
 		}
 
 		// Reload timer
-		c.timer = 524288/c.getDividingRatio()/2 ^ (int(c.frequency) + 1)
+		c.timer = c.getDividingRatio() << c.shiftClockFrequency
 	}
 }
 
 func (c *Channel4) sample() byte {
-	// The waveform output is bit 0 of the LFSR, INVERTED
-	bit := c.LFSR & 0x1
+	if c.enable && c.DACEnable {
+		// The waveform output is bit 0 of the LFSR, INVERTED
+		bit := c.LFSR & 0x1
 
-	if bit == 1 {
-		return c.volume
+		if bit == 1 {
+			return c.volume
+		}
 	}
 
 	return 0
@@ -150,6 +147,7 @@ func (c *Channel4) WriteByte(addr uint16, value byte) {
 		c.length = int(value)
 	case addr == NR42:
 		c.volumeEnvelopeWriteByte(value)
+		c.DACEnable = (value & 0xf8) > 0
 	case addr == NR43:
 		c.shiftClockFrequency = value >> 4
 		c.counterWidth = utils.IsBitSet(value, 3)

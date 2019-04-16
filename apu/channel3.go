@@ -137,7 +137,7 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 		c.enable = utils.IsBitSet(value, 7)
 		c.DACEnable = utils.IsBitSet(value, 7)
 	case addr == NR31:
-		c.length = int(value)
+		c.length = 256 - int(value)
 	case addr == NR32:
 		// Bit 6-5 - Select output level
 		c.volume = (value >> 5) & 0x3

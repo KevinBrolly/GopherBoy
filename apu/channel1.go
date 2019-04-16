@@ -90,7 +90,7 @@ func (c *Channel1) Tick(tCycles int) {
 }
 
 func (c *Channel1) sample() byte {
-	if !c.enable {
+	if !c.enable && !c.DACEnable {
 		return 0
 	}
 
@@ -201,6 +201,7 @@ func (c *Channel1) WriteByte(addr uint16, value byte) {
 		c.length = int(value & 0x3F)
 	case addr == NR12:
 		c.volumeEnvelopeWriteByte(value)
+		c.DACEnable = (value & 0xf8) > 0
 	case addr == NR13:
 		c.writeFrequencyLowerBits(value)
 	case addr == NR14:

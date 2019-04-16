@@ -71,7 +71,6 @@ func (c *Channel3) Tick(tCycles int) {
 		} else {
 			c.buffer = wavePatternByte >> 4
 		}
-
 		// Reload timer
 		c.timer = (2048 - int(c.frequency)) * 2
 	}
@@ -136,6 +135,7 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 	case addr == NR30:
 		// Bit 7 - Sound Channel 3 Off  (0=Stop, 1=Playback)
 		c.enable = utils.IsBitSet(value, 7)
+		c.DACEnable = utils.IsBitSet(value, 7)
 	case addr == NR31:
 		c.length = int(value)
 	case addr == NR32:
@@ -146,7 +146,7 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 	case addr == NR34:
 		// Bit 7   - Initial (1=Restart Sound)
 		// Bit 6   - Counter/consecutive selection
-		// 		  (1=Stop output when length in NR11 expires)
+		// 		  (1=Stop output when length in NR34 expires)
 		// Bit 2-0 - Frequency's higher 3 bits (x)
 		c.lengthEnable = utils.IsBitSet(value, 6)
 

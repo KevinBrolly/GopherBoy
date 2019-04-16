@@ -276,8 +276,8 @@ func (s *APU) WriteByte(addr uint16, value byte) {
 	case addr == NR50:
 		s.outputVinSO1 = utils.IsBitSet(value, 3)
 		s.outputVinSO2 = utils.IsBitSet(value, 7)
-		s.volumeSO1 = (value & 0x7)
-		s.volumeSO2 = (value & 0x70)
+		s.volumeSO1 = value & 0x7
+		s.volumeSO2 = value & 0x70
 	case addr == NR51:
 		s.output4SO2 = utils.IsBitSet(value, 7)
 		s.output3SO2 = utils.IsBitSet(value, 6)

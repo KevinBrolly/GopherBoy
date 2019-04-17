@@ -46,8 +46,18 @@ func (c *Channel3) trigger() {
 
 	c.timer = (2048 - int(c.frequency)) * 2
 
+	// Volume envelope timer is reloaded with period.
+	c.volumeEnvelopeTimer = c.volumeEnvelopePeriod
+	// Channel volume is reloaded
+	c.volume = c.volumeEnvelopeInitial
+
 	// Wave channel's position is set to 0 but sample buffer is NOT refilled.
 	c.position = 0
+
+	// Note that if the channel's DAC is off, after the above actions occur the channel will be immediately disabled again.
+	if !c.DACEnable {
+		c.enable = false
+	}
 }
 
 func (c *Channel3) Tick(tCycles int) {

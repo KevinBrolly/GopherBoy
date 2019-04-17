@@ -53,6 +53,11 @@ func (c *Channel4) trigger() {
 
 	// Noise channel's LFSR bits are all set to 1.
 	c.LFSR = 0x7FFF
+
+	// Note that if the channel's DAC is off, after the above actions occur the channel will be immediately disabled again.
+	if !c.DACEnable {
+		c.enable = false
+	}
 }
 
 func (c *Channel4) Tick(tCycles int) {

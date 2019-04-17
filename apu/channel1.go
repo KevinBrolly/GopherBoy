@@ -62,6 +62,11 @@ func (c *Channel1) trigger() {
 	if c.sweepShift != 0 {
 		c.calculateSweep()
 	}
+
+	// Note that if the channel's DAC is off, after the above actions occur the channel will be immediately disabled again.
+	if !c.DACEnable {
+		c.enable = false
+	}
 }
 
 func (c *Channel1) Tick(tCycles int) {

@@ -46,11 +46,6 @@ func (c *Channel3) trigger() {
 
 	c.timer = (2048 - int(c.frequency)) * 2
 
-	// Volume envelope timer is reloaded with period.
-	c.volumeEnvelopeTimer = c.volumeEnvelopePeriod
-	// Channel volume is reloaded
-	c.volume = c.volumeEnvelopeInitial
-
 	// Wave channel's position is set to 0 but sample buffer is NOT refilled.
 	c.position = 0
 

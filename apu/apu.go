@@ -1,6 +1,9 @@
 package apu
 
 import (
+	"bytes"
+	"encoding/binary"
+
 	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/utils"
 	"github.com/veandco/go-sdl2/sdl"
@@ -13,7 +16,7 @@ const (
 
 	// The frame sequencer runs at 512 Hz, which is 4194304/512=8192 clock cycles
 	FrameSequencerTimerRate = 8192
-	sampleBufferSize        = 1024
+	Samples                 = 2048
 )
 
 type APU struct {
@@ -22,9 +25,9 @@ type APU struct {
 	channel3 *Channel3
 	channel4 *Channel4
 
-	sampleTimer       int
-	sampleBuffer      []byte
-	sampleBufferIndex int
+	sampleTimer  int
+	sampleBuffer *bytes.Buffer
+	sampleCount  int
 
 	frameSequencerTimer int
 	frameSequencerStep  int
@@ -55,7 +58,7 @@ func NewAPU(mmu *mmu.MMU) *APU {
 		channel2:     NewChannel2(mmu),
 		channel3:     NewChannel3(mmu),
 		channel4:     NewChannel4(mmu),
-		sampleBuffer: make([]byte, sampleBufferSize),
+		sampleBuffer: new(bytes.Buffer),
 	}
 
 	// FF24 - NR50 - Channel control / ON-OFF / Volume
@@ -69,9 +72,9 @@ func NewAPU(mmu *mmu.MMU) *APU {
 
 	spec := &sdl.AudioSpec{
 		Freq:     44100,
-		Format:   sdl.AUDIO_U8,
+		Format:   sdl.AUDIO_S16,
 		Channels: 2,
-		Samples:  1024,
+		Samples:  Samples,
 	}
 
 	if err := sdl.OpenAudio(spec, nil); err != nil {
@@ -103,14 +106,14 @@ func (s *APU) Tick(mCycles int) {
 	}
 
 	if s.sampleTimer <= 0 {
-		SO2 := byte(0)
-		SO1 := byte(0)
+		SO2 := int(0)
+		SO1 := int(0)
 
 		if s.enable {
-			channel1Sample := s.channel1.sample()
-			channel2Sample := s.channel2.sample()
-			channel3Sample := s.channel3.sample()
-			channel4Sample := s.channel4.sample()
+			channel1Sample := int(s.channel1.sample())
+			channel2Sample := int(s.channel2.sample())
+			channel3Sample := int(s.channel3.sample())
+			channel4Sample := int(s.channel4.sample())
 
 			if s.output4SO2 {
 				SO2 += channel4Sample
@@ -139,23 +142,26 @@ func (s *APU) Tick(mCycles int) {
 			}
 		}
 
-		SO2 = SO2 * (s.volumeSO2 + 1)
-		SO1 = SO1 * (s.volumeSO1 + 1)
+		SO2 = (SO2 * int(s.volumeSO2+1)) * 8
 
-		s.sampleBuffer[s.sampleBufferIndex] = SO2
-		s.sampleBufferIndex++
+		SO1 = (SO1 * int(s.volumeSO1+1)) * 8
 
-		s.sampleBuffer[s.sampleBufferIndex] = SO1
-		s.sampleBufferIndex++
+		var L = int16(SO1)
+		var R = int16(SO2)
 
-		if s.sampleBufferIndex == sampleBufferSize {
-			s.sampleBufferIndex = 0
+		binary.Write(s.sampleBuffer, binary.LittleEndian, L)
+		binary.Write(s.sampleBuffer, binary.LittleEndian, R)
+		s.sampleCount++
 
-			for sdl.GetQueuedAudioSize(1) > (sampleBufferSize * 4) {
+		if s.sampleCount == Samples {
+			s.sampleCount = 0
+
+			for sdl.GetQueuedAudioSize(1) > (Samples * 4) {
 				sdl.Delay(1)
 			}
 
-			sdl.QueueAudio(1, s.sampleBuffer)
+			sdl.QueueAudio(1, s.sampleBuffer.Bytes())
+			s.sampleBuffer.Reset()
 		}
 
 		// Reload sample timer

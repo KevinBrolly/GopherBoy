@@ -299,7 +299,7 @@ func (ppu *PPU) setLCDCFields(value byte) {
 
 func (ppu *PPU) Step(cycles byte) {
 	if ppu.lcdEnabled {
-		ppu.Cycles += int(cycles)
+		ppu.Cycles += int(cycles * 4)
 
 		// STAT indicates the current status of the LCD controller.
 		switch ppu.STAT.mode {

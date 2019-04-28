@@ -16,6 +16,7 @@ const (
 
 	// The frame sequencer runs at 512 Hz, which is 4194304/512=8192 clock cycles
 	FrameSequencerTimerRate = 8192
+	Frequency               = 44100
 	Samples                 = 2048
 )
 
@@ -71,7 +72,7 @@ func NewAPU(mmu *mmu.MMU) *APU {
 	mmu.MapMemory(apu, NR52)
 
 	spec := &sdl.AudioSpec{
-		Freq:     44100,
+		Freq:     Frequency,
 		Format:   sdl.AUDIO_S16,
 		Channels: 2,
 		Samples:  Samples,
@@ -140,32 +141,27 @@ func (s *APU) Tick(mCycles int) {
 			if s.output1SO1 {
 				SO1 += channel1Sample
 			}
-		}
 
-		SO2 = (SO2 * int(s.volumeSO2+1)) * 8
+			SO2 = (SO2 * int(s.volumeSO2+1)) * 8
 
-		SO1 = (SO1 * int(s.volumeSO1+1)) * 8
+			SO1 = (SO1 * int(s.volumeSO1+1)) * 8
 
-		var L = int16(SO1)
-		var R = int16(SO2)
+			var L = int16(SO1)
+			var R = int16(SO2)
 
-		binary.Write(s.sampleBuffer, binary.LittleEndian, L)
-		binary.Write(s.sampleBuffer, binary.LittleEndian, R)
-		s.sampleCount++
+			binary.Write(s.sampleBuffer, binary.LittleEndian, L)
+			binary.Write(s.sampleBuffer, binary.LittleEndian, R)
+			s.sampleCount++
 
-		if s.sampleCount == Samples {
-			s.sampleCount = 0
-
-			for sdl.GetQueuedAudioSize(1) > (Samples * 4) {
-				sdl.Delay(1)
+			if s.sampleCount == Samples {
+				s.sampleCount = 0
+				sdl.QueueAudio(1, s.sampleBuffer.Bytes())
+				s.sampleBuffer.Reset()
 			}
 
-			sdl.QueueAudio(1, s.sampleBuffer.Bytes())
-			s.sampleBuffer.Reset()
+			// Reload sample timer
+			s.sampleTimer = 4194304 / Frequency
 		}
-
-		// Reload sample timer
-		s.sampleTimer = 4194304 / 44100
 	}
 }
 

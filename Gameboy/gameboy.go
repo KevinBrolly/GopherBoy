@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"time"
 
 	"github.com/kevinbrolly/GopherBoy/apu"
 	"github.com/kevinbrolly/GopherBoy/control"
@@ -83,7 +84,12 @@ func (gameboy *Gameboy) LoadCartridgeData(filename string) {
 }
 
 func (gameboy *Gameboy) Run() {
-	for {
+	frameTime := time.Second / 60
+
+	ticker := time.NewTicker(frameTime)
+	start := time.Now()
+	frames := 0
+	for range ticker.C {
 		MAXCYCLES := 69905
 		cyclesThisUpdate := 0
 
@@ -91,7 +97,7 @@ func (gameboy *Gameboy) Run() {
 			cycles := gameboy.CPU.Step()
 			gameboy.PPU.Step(cycles)
 			gameboy.APU.Tick(int(cycles))
-			cyclesThisUpdate += int(cycles)
+			cyclesThisUpdate += int(cycles * 4)
 
 			// fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %#x, IF: %#x, LCDC: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n",
 			// 	gameboy.CPU.GetOpcode(),
@@ -163,6 +169,12 @@ func (gameboy *Gameboy) Run() {
 		}
 
 		gameboy.PPU.Window.Update()
+		frames++
+		since := time.Since(start)
+		if since > time.Second {
+			start = time.Now()
+			frames = 0
+		}
 	}
 }
 

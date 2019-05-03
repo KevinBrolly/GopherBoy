@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	NR20 = 0xFF15
 	NR21 = 0xFF16
 	NR22 = 0xFF17
 	NR23 = 0xFF18
@@ -22,6 +23,7 @@ type Channel2 struct {
 func NewChannel2(mmu *mmu.MMU) *Channel2 {
 	channel := &Channel2{}
 
+	mmu.MapMemory(channel, NR20)
 	mmu.MapMemory(channel, NR21)
 	mmu.MapMemory(channel, NR22)
 	mmu.MapMemory(channel, NR23)
@@ -100,22 +102,22 @@ func (c *Channel2) sample() byte {
 }
 
 func (c *Channel2) ReadByte(addr uint16) byte {
+	var value byte
+
 	switch {
 	case addr == NR21:
 		// Bit 7-6 - Wave Pattern Duty
-		value := (c.wavePatternDuty << 6)
-		return value
+		value = (c.wavePatternDuty << 6)
 	case addr == NR22:
-		return c.volumeEnvelopeReadByte()
+		value = c.volumeEnvelopeReadByte()
 	case addr == NR24:
 		// Bit 6   - Counter/consecutive selection
-		var value byte
 		if c.lengthEnable {
 			value = utils.SetBit(value, 6)
 		}
-		return value
 	}
-	return 0
+
+	return value | apuReadMask[addr]
 }
 
 func (c *Channel2) WriteByte(addr uint16, value byte) {

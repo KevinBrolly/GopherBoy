@@ -110,29 +110,26 @@ func (c *Channel3) sample() byte {
 }
 
 func (c *Channel3) ReadByte(addr uint16) byte {
+	var value byte
+
 	switch {
 	case addr == NR30:
 		// Bit 7 - Sound Channel 3 Off  (0=Stop, 1=Playback)
-		var value byte
 		if c.enable {
 			value = utils.SetBit(value, 7)
 		}
-		return value
 	case addr == NR32:
-		var value byte
 		value = c.volume << 5
-		return value
 	case addr == NR34:
 		// Bit 6   - Counter/consecutive selection
-		var value byte
 		if c.lengthEnable {
 			value = utils.SetBit(value, 6)
 		}
-		return value
 	case addr >= 0xFF30 && addr <= 0xFF3F:
-		return c.wavePatternRAM[addr&0xF]
+		value = c.wavePatternRAM[addr&0xF]
 	}
-	return 0
+
+	return value | apuReadMask[addr]
 }
 
 func (c *Channel3) WriteByte(addr uint16, value byte) {
@@ -164,5 +161,4 @@ func (c *Channel3) WriteByte(addr uint16, value byte) {
 	case addr >= 0xFF30 && addr <= 0xFF3F:
 		c.wavePatternRAM[addr&0xF] = value
 	}
-
 }

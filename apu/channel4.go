@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	NR40 = 0xFF1F
 	NR41 = 0xFF20
 	NR42 = 0xFF21
 	NR43 = 0xFF22
@@ -26,6 +27,7 @@ type Channel4 struct {
 func NewChannel4(mmu *mmu.MMU) *Channel4 {
 	channel := &Channel4{}
 
+	mmu.MapMemory(channel, NR40)
 	mmu.MapMemory(channel, NR41)
 	mmu.MapMemory(channel, NR42)
 	mmu.MapMemory(channel, NR43)
@@ -117,32 +119,31 @@ func (c *Channel4) getDividingRatio() int {
 }
 
 func (c *Channel4) ReadByte(addr uint16) byte {
+	var value byte
+
 	switch {
 	case addr == NR41:
 		// Bit 5-0 - Sound length data
-		return byte(c.length)
+		value = byte(c.length)
 	case addr == NR42:
-		return c.volumeEnvelopeReadByte()
+		value = c.volumeEnvelopeReadByte()
 	case addr == NR43:
 		// Bit 7-4 - Shift Clock Frequency (s)
 		// Bit 3   - Counter Step/Width (0=15 bits, 1=7 bits)
 		// Bit 2-0 - Dividing Ratio of Frequencies (r)
-		var value byte
 		value = c.shiftClockFrequency << 4
 		if c.counterWidth {
 			value = utils.SetBit(value, 3)
 		}
 		value = value | c.dividingRatio
-		return value
 	case addr == NR44:
 		// Bit 6   - Counter/consecutive selection
-		var value byte
 		if c.lengthEnable {
 			value = utils.SetBit(value, 6)
 		}
-		return value
 	}
-	return 0
+
+	return value | apuReadMask[addr]
 }
 
 func (c *Channel4) WriteByte(addr uint16, value byte) {

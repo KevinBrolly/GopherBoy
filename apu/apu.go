@@ -20,6 +20,43 @@ const (
 	Samples                 = 2048
 )
 
+// When an NRxx register is read back, the last written value ORed with the following is returned:
+var apuReadMask = map[uint16]byte{
+	NR10: 0x80,
+	NR11: 0x3F,
+	NR12: 0x00,
+	NR13: 0xFF,
+	NR14: 0xBF,
+	NR20: 0xFF,
+	NR21: 0x3F,
+	NR22: 0x00,
+	NR23: 0xFF,
+	NR24: 0xBF,
+	NR30: 0x7F,
+	NR31: 0xFF,
+	NR32: 0x9F,
+	NR33: 0xFF,
+	NR34: 0xBF,
+	NR40: 0xFF,
+	NR41: 0xFF,
+	NR42: 0x00,
+	NR43: 0x00,
+	NR44: 0xBF,
+	NR50: 0x00,
+	NR51: 0x00,
+	NR52: 0x70,
+
+	0xFF27: 0xFF,
+	0xFF28: 0xFF,
+	0xFF29: 0xFF,
+	0xFF2A: 0xFF,
+	0xFF2B: 0xFF,
+	0xFF2C: 0xFF,
+	0xFF2D: 0xFF,
+	0xFF2E: 0xFF,
+	0xFF2F: 0xFF,
+}
+
 type APU struct {
 	channel1 *Channel1
 	channel2 *Channel2
@@ -70,6 +107,8 @@ func NewAPU(mmu *mmu.MMU) *APU {
 
 	// FF26 - NR52 - Sound on/off
 	mmu.MapMemory(apu, NR52)
+
+	mmu.MapMemoryRange(apu, 0xFF27, 0xFF2F)
 
 	spec := &sdl.AudioSpec{
 		Freq:     Frequency,
@@ -142,9 +181,8 @@ func (s *APU) Tick(mCycles int) {
 				SO1 += channel1Sample
 			}
 
-			SO2 = (SO2 * int(s.volumeSO2+1)) * 8
-
-			SO1 = (SO1 * int(s.volumeSO1+1)) * 8
+			SO2 = ((0xf - SO2*2) * int(s.volumeSO2+1))
+			SO1 = ((0xf - SO1*2) * int(s.volumeSO1+1))
 
 			var L = int16(SO1)
 			var R = int16(SO2)
@@ -198,9 +236,10 @@ func (s *APU) tickFrameSequencer() {
 }
 
 func (s *APU) ReadByte(addr uint16) byte {
+	var value byte
+
 	switch {
 	case addr == NR50:
-		var value byte
 		if s.outputVinSO1 {
 			value = utils.SetBit(value, 3)
 		}
@@ -211,10 +250,7 @@ func (s *APU) ReadByte(addr uint16) byte {
 
 		value |= s.volumeSO1
 		value |= s.volumeSO2
-
-		return value
 	case addr == NR51:
-		var value byte
 		if s.output4SO2 {
 			value = utils.SetBit(value, 7)
 		}
@@ -246,9 +282,7 @@ func (s *APU) ReadByte(addr uint16) byte {
 		if s.output1SO1 {
 			value = utils.SetBit(value, 0)
 		}
-		return value
 	case addr == NR52:
-		var value byte
 		if s.enable {
 			value = utils.SetBit(value, 7)
 		}
@@ -268,9 +302,9 @@ func (s *APU) ReadByte(addr uint16) byte {
 		if s.channel1.enable {
 			value = utils.SetBit(value, 0)
 		}
-		return value
 	}
-	return 0
+
+	return value | apuReadMask[addr]
 }
 
 func (s *APU) WriteByte(addr uint16, value byte) {

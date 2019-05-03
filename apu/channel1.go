@@ -155,6 +155,8 @@ func (c *Channel1) TickSweep() {
 }
 
 func (c *Channel1) ReadByte(addr uint16) byte {
+	var value byte
+
 	switch {
 	case addr == NR10:
 		// Bit 6-4 - Sweep Time
@@ -162,30 +164,26 @@ func (c *Channel1) ReadByte(addr uint16) byte {
 		// 	0: Addition    (frequency increases)
 		// 	1: Subtraction (frequency decreases)
 		// Bit 2-0 - Number of sweep shift (n: 0-7)
-		var value byte
 		value = (c.sweepPeriod << 4)
 
 		if c.sweepNegate {
 			value = utils.SetBit(value, 3)
 		}
 
-		value = value & c.sweepShift
-		return value
+		value = value | c.sweepShift
 	case addr == NR11:
 		// Bit 7-6 - Wave Pattern Duty
-		value := (c.wavePatternDuty << 6)
-		return value
+		value = (c.wavePatternDuty << 6)
 	case addr == NR12:
-		return c.volumeEnvelopeReadByte()
+		value = c.volumeEnvelopeReadByte()
 	case addr == NR14:
 		// Bit 6   - Counter/consecutive selection
-		var value byte
 		if c.lengthEnable {
 			value = utils.SetBit(value, 6)
 		}
-		return value
 	}
-	return 0
+
+	return value | apuReadMask[addr]
 }
 
 func (c *Channel1) WriteByte(addr uint16, value byte) {

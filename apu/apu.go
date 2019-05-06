@@ -58,6 +58,7 @@ var apuReadMask = map[uint16]byte{
 }
 
 type APU struct {
+	mmu      *mmu.MMU
 	channel1 *Channel1
 	channel2 *Channel2
 	channel3 *Channel3
@@ -92,6 +93,7 @@ type APU struct {
 
 func NewAPU(mmu *mmu.MMU) *APU {
 	apu := &APU{
+		mmu:          mmu,
 		channel1:     NewChannel1(mmu),
 		channel2:     NewChannel2(mmu),
 		channel3:     NewChannel3(mmu),
@@ -324,6 +326,15 @@ func (s *APU) WriteByte(addr uint16, value byte) {
 		s.output2SO1 = utils.IsBitSet(value, 1)
 		s.output1SO1 = utils.IsBitSet(value, 0)
 	case addr == NR52:
-		s.enable = utils.IsBitSet(value, 7)
+		if utils.IsBitSet(value, 7) {
+			s.enable = true
+		} else {
+			// NR52 controls power to the sound hardware. When powered off, all registers (NR10-NR51) are instantly written with zero and any writes to those registers are ignored while power remains off
+			// (except on the DMG, where length counters are unaffected by power and can still be written while off).
+			s.enable = false
+			for addr := NR10; addr < NR52; addr++ {
+				s.mmu.WriteByte(uint16(addr), 0x00)
+			}
+		}
 	}
 }

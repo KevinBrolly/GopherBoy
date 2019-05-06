@@ -34,7 +34,6 @@ func NewChannel1(mmu *mmu.MMU) *Channel1 {
 	mmu.MapMemory(channel, NR12)
 	mmu.MapMemory(channel, NR13)
 	mmu.MapMemory(channel, NR14)
-
 	return channel
 }
 
@@ -205,6 +204,11 @@ func (c *Channel1) WriteByte(addr uint16, value byte) {
 	case addr == NR12:
 		c.volumeEnvelopeWriteByte(value)
 		c.DACEnable = (value & 0xf8) > 0
+
+		// Any time the DAC is off the channel is kept disabled
+		if !c.DACEnable {
+			c.enable = false
+		}
 	case addr == NR13:
 		c.writeFrequencyLowerBits(value)
 	case addr == NR14:

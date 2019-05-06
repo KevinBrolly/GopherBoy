@@ -154,6 +154,11 @@ func (c *Channel4) WriteByte(addr uint16, value byte) {
 	case addr == NR42:
 		c.volumeEnvelopeWriteByte(value)
 		c.DACEnable = (value & 0xf8) > 0
+
+		// Any time the DAC is off the channel is kept disabled
+		if !c.DACEnable {
+			c.enable = false
+		}
 	case addr == NR43:
 		c.shiftClockFrequency = value >> 4
 		c.counterWidth = utils.IsBitSet(value, 3)

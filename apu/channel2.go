@@ -130,6 +130,11 @@ func (c *Channel2) WriteByte(addr uint16, value byte) {
 	case addr == NR22:
 		c.volumeEnvelopeWriteByte(value)
 		c.DACEnable = (value & 0xf8) > 0
+
+		// Any time the DAC is off the channel is kept disabled
+		if !c.DACEnable {
+			c.enable = false
+		}
 	case addr == NR23:
 		c.writeFrequencyLowerBits(value)
 	case addr == NR24:

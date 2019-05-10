@@ -3,7 +3,6 @@ package apu
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/utils"
@@ -361,7 +360,7 @@ func (s *APU) ReadByte(addr uint16) byte {
 	if addr >= 0xFF30 && addr <= 0xFF3F {
 		value = s.channel3.ReadByte(addr)
 	}
-	fmt.Printf("Read Byte: Addr: %#x, Value: %#x\n", addr, value|apuReadMask[addr])
+	//fmt.Printf("Read Byte: Addr: %#x, Value: %#x\n", addr, value|apuReadMask[addr])
 	return value | apuReadMask[addr]
 }
 
@@ -421,7 +420,7 @@ func (s *APU) WriteByte(addr uint16, value byte) {
 			if addr >= 0xFF30 && addr <= 0xFF3F {
 				s.channel3.WriteByte(addr, value)
 			}
-			fmt.Printf("Write Byte: Addr: %#x, Value: %#x\n", addr, value)
+			//fmt.Printf("Write Byte: Addr: %#x, Value: %#x\n", addr, value)
 		}
 	}
 }

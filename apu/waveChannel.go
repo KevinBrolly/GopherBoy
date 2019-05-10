@@ -113,9 +113,14 @@ func (c *WaveChannel) WriteByte(addr uint16, value byte) {
 	switch {
 	case addr == NR30:
 		// Bit 7 - Sound Channel 3 Off  (0=Stop, 1=Playback)
-		c.enable = utils.IsBitSet(value, 7)
 		c.DACEnable = utils.IsBitSet(value, 7)
+
+		// Any time the DAC is off the channel is kept disabled
+		if !c.DACEnable {
+			c.enable = false
+		}
 	case addr == NR31:
+		// Writing a byte to NRx1 loads the wave channel length counter with 256 - data
 		c.length = 256 - int(value)
 	case addr == NR32:
 		// Bit 6-5 - Select output level

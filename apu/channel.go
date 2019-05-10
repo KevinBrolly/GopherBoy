@@ -1,6 +1,8 @@
 package apu
 
-import "github.com/kevinbrolly/GopherBoy/utils"
+import (
+	"github.com/kevinbrolly/GopherBoy/utils"
+)
 
 type Channel struct {
 	DACEnable bool
@@ -167,7 +169,9 @@ func (c *Square) WriteByte(addr uint16, value byte) {
 		// Bit 7-6 - Wave Pattern Duty
 		// Bit 5-0 - Sound length data
 		c.wavePatternDuty = (value >> 6) & 0x3
-		c.length = int(value & 0x3F)
+
+		// Writing a byte to NRx1 loads the length counter with 64 - data
+		c.length = 64 - int(value&0x3F)
 	case NR12, NR22:
 		c.volumeEnvelopeWriteByte(value)
 		c.DACEnable = (value & 0xf8) > 0

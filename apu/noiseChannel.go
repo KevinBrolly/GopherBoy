@@ -130,7 +130,9 @@ func (c *NoiseChannel) WriteByte(addr uint16, value byte) {
 	switch addr {
 	case NR41:
 		// Bit 5-0 - Sound length data
-		c.length = int(value)
+
+		// Writing a byte to NRx1 loads the length counter with 64 - data
+		c.length = 64 - int(value&0x3f)
 	case NR42:
 		c.volumeEnvelopeWriteByte(value)
 		c.DACEnable = (value & 0xf8) > 0

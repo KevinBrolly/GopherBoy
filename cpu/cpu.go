@@ -130,7 +130,12 @@ func (cpu *CPU) Step() (cycles byte) {
 
 		cycles = instruction.Execute(cpu)
 
-		if initialPC == cpu.PC {
+		// The && opcode != 0x18 is a quick hack to stop a bug whereby in opcode 0x18 it is possible
+		// to end up with initalPC and cpu.PC being equal even when the instruction has completed
+		// successfully, and therefore adding the CurrentInstruction.Length leaves us with an incorrect
+		// cpu.PC value.
+		// TODO: Refactor CPU instructions to increment PC themselves.
+		if initialPC == cpu.PC && opcode != 0x18 {
 			cpu.PC += cpu.CurrentInstruction.Length
 		}
 	} else {

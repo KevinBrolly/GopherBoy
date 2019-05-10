@@ -1,20 +1,12 @@
 package apu
 
 import (
-	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/utils"
 )
 
-const (
-	NR40 = 0xFF1F
-	NR41 = 0xFF20
-	NR42 = 0xFF21
-	NR43 = 0xFF22
-	NR44 = 0xFF23
-)
-
-type Channel4 struct {
+type NoiseChannel struct {
 	Channel
+	VolumeEnvelope
 
 	// Linear Feedback Shift Register — 15-bit
 	LFSR uint16
@@ -24,19 +16,7 @@ type Channel4 struct {
 	dividingRatio       byte
 }
 
-func NewChannel4(mmu *mmu.MMU) *Channel4 {
-	channel := &Channel4{}
-
-	mmu.MapMemory(channel, NR40)
-	mmu.MapMemory(channel, NR41)
-	mmu.MapMemory(channel, NR42)
-	mmu.MapMemory(channel, NR43)
-	mmu.MapMemory(channel, NR44)
-
-	return channel
-}
-
-func (c *Channel4) trigger() {
+func (c *NoiseChannel) trigger() {
 	// Channel is enabled
 	c.enable = true
 
@@ -62,7 +42,7 @@ func (c *Channel4) trigger() {
 	}
 }
 
-func (c *Channel4) Tick(tCycles int) {
+func (c *NoiseChannel) Tick(tCycles int) {
 	if c.timer > 0 {
 		c.timer -= tCycles
 	}
@@ -87,7 +67,7 @@ func (c *Channel4) Tick(tCycles int) {
 	}
 }
 
-func (c *Channel4) sample() byte {
+func (c *NoiseChannel) sample() byte {
 	if c.enable && c.DACEnable {
 		// The waveform output is bit 0 of the LFSR, INVERTED
 		bit := c.LFSR & 0x1
@@ -100,7 +80,7 @@ func (c *Channel4) sample() byte {
 	return 0
 }
 
-func (c *Channel4) getDividingRatio() int {
+func (c *NoiseChannel) getDividingRatio() int {
 	// Divisor code   Divisor
 	// -----------------------
 	// 0             8
@@ -118,16 +98,16 @@ func (c *Channel4) getDividingRatio() int {
 	return int(c.dividingRatio * 16)
 }
 
-func (c *Channel4) ReadByte(addr uint16) byte {
+func (c *NoiseChannel) ReadByte(addr uint16) byte {
 	var value byte
 
-	switch {
-	case addr == NR41:
+	switch addr {
+	case NR41:
 		// Bit 5-0 - Sound length data
 		value = byte(c.length)
-	case addr == NR42:
+	case NR42:
 		value = c.volumeEnvelopeReadByte()
-	case addr == NR43:
+	case NR43:
 		// Bit 7-4 - Shift Clock Frequency (s)
 		// Bit 3   - Counter Step/Width (0=15 bits, 1=7 bits)
 		// Bit 2-0 - Dividing Ratio of Frequencies (r)
@@ -136,22 +116,22 @@ func (c *Channel4) ReadByte(addr uint16) byte {
 			value = utils.SetBit(value, 3)
 		}
 		value = value | c.dividingRatio
-	case addr == NR44:
+	case NR44:
 		// Bit 6   - Counter/consecutive selection
 		if c.lengthEnable {
 			value = utils.SetBit(value, 6)
 		}
 	}
 
-	return value | apuReadMask[addr]
+	return value
 }
 
-func (c *Channel4) WriteByte(addr uint16, value byte) {
-	switch {
-	case addr == NR41:
+func (c *NoiseChannel) WriteByte(addr uint16, value byte) {
+	switch addr {
+	case NR41:
 		// Bit 5-0 - Sound length data
 		c.length = int(value)
-	case addr == NR42:
+	case NR42:
 		c.volumeEnvelopeWriteByte(value)
 		c.DACEnable = (value & 0xf8) > 0
 
@@ -159,11 +139,11 @@ func (c *Channel4) WriteByte(addr uint16, value byte) {
 		if !c.DACEnable {
 			c.enable = false
 		}
-	case addr == NR43:
+	case NR43:
 		c.shiftClockFrequency = value >> 4
 		c.counterWidth = utils.IsBitSet(value, 3)
 		c.dividingRatio = value & 0x7
-	case addr == NR44:
+	case NR44:
 		// Bit 7   - Initial (1=Restart Sound)
 		// Bit 6   - Counter/consecutive selection
 		// 		  (1=Stop output when length in NR11 expires)

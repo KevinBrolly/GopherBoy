@@ -3,6 +3,7 @@ package apu
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/utils"
@@ -10,9 +11,41 @@ import (
 )
 
 const (
+
+	// Square 1 Channel Registers
+	NR10 = 0xFF10
+	NR11 = 0xFF11
+	NR12 = 0xFF12
+	NR13 = 0xFF13
+	NR14 = 0xFF14
+
+	// Square 2 Channel Registers
+	NR20 = 0xFF15
+	NR21 = 0xFF16
+	NR22 = 0xFF17
+	NR23 = 0xFF18
+	NR24 = 0xFF19
+
+	// Wave Channel Registers
+	NR30 = 0xFF1A
+	NR31 = 0xFF1B
+	NR32 = 0xFF1C
+	NR33 = 0xFF1D
+	NR34 = 0xFF1E
+
+	// Noise Channel Registers
+	NR40 = 0xFF1F
+	NR41 = 0xFF20
+	NR42 = 0xFF21
+	NR43 = 0xFF22
+	NR44 = 0xFF23
+
 	NR50 = 0xFF24
 	NR51 = 0xFF25
 	NR52 = 0xFF26
+
+	wavePatternRamStart = 0xFF30
+	wavePatternRamEnd   = 0xFF3F
 
 	// The frame sequencer runs at 512 Hz, which is 4194304/512=8192 clock cycles
 	FrameSequencerTimerRate = 8192
@@ -46,6 +79,7 @@ var apuReadMask = map[uint16]byte{
 	NR51: 0x00,
 	NR52: 0x70,
 
+	// Unused memory between NR52 and Wave Pattern RAM, always returns 0xFF
 	0xFF27: 0xFF,
 	0xFF28: 0xFF,
 	0xFF29: 0xFF,
@@ -59,10 +93,10 @@ var apuReadMask = map[uint16]byte{
 
 type APU struct {
 	mmu      *mmu.MMU
-	channel1 *Channel1
-	channel2 *Channel2
-	channel3 *Channel3
-	channel4 *Channel4
+	channel1 *Square1Channel
+	channel2 *Square2Channel
+	channel3 *WaveChannel
+	channel4 *NoiseChannel
 
 	sampleTimer  int
 	sampleBuffer *bytes.Buffer
@@ -94,23 +128,22 @@ type APU struct {
 func NewAPU(mmu *mmu.MMU) *APU {
 	apu := &APU{
 		mmu:          mmu,
-		channel1:     NewChannel1(mmu),
-		channel2:     NewChannel2(mmu),
-		channel3:     NewChannel3(mmu),
-		channel4:     NewChannel4(mmu),
+		channel1:     &Square1Channel{},
+		channel2:     &Square2Channel{},
+		channel3:     &WaveChannel{},
+		channel4:     &NoiseChannel{},
 		sampleBuffer: new(bytes.Buffer),
 	}
 
-	// FF24 - NR50 - Channel control / ON-OFF / Volume
-	mmu.MapMemory(apu, NR50)
+	// 0xFF10 - 0xFF26
+	mmu.MapMemoryRange(apu, NR10, NR52)
 
-	// FF25 - NR51 - Selection of Sound output terminal
-	mmu.MapMemory(apu, NR51)
-
-	// FF26 - NR52 - Sound on/off
-	mmu.MapMemory(apu, NR52)
-
+	// Unused memory between NR52 and Wave Pattern RAM
+	// 0xFF27 - 0xFF2F
 	mmu.MapMemoryRange(apu, 0xFF27, 0xFF2F)
+
+	// 0xFF30 - 0xFF3F Wave Pattern Ram for WaveChannel
+	mmu.MapMemoryRange(apu, wavePatternRamStart, wavePatternRamEnd)
 
 	spec := &sdl.AudioSpec{
 		Freq:     Frequency,
@@ -228,7 +261,7 @@ func (s *APU) tickFrameSequencer() {
 	}
 
 	// Step the sequencer
-	s.frameSequencerStep += 1
+	s.frameSequencerStep++
 	if s.frameSequencerStep == 8 {
 		s.frameSequencerStep = 0
 	}
@@ -240,8 +273,27 @@ func (s *APU) tickFrameSequencer() {
 func (s *APU) ReadByte(addr uint16) byte {
 	var value byte
 
-	switch {
-	case addr == NR50:
+	switch addr {
+
+	// Square 1 Channel Registers
+	case NR10:
+		value = s.channel1.ReadSweep(addr)
+	case NR11, NR12, NR13, NR14:
+		value = s.channel1.ReadByte(addr)
+
+	// Square 2 Channel Registers
+	case NR20, NR21, NR22, NR23, NR24:
+		value = s.channel2.ReadByte(addr)
+
+	// Wave Channel Registers
+	case NR30, NR31, NR32, NR33, NR34:
+		value = s.channel3.ReadByte(addr)
+
+	// Noise Channel Registers
+	case NR40, NR41, NR42, NR43, NR44:
+		value = s.channel4.ReadByte(addr)
+
+	case NR50:
 		if s.outputVinSO1 {
 			value = utils.SetBit(value, 3)
 		}
@@ -252,7 +304,7 @@ func (s *APU) ReadByte(addr uint16) byte {
 
 		value |= s.volumeSO1
 		value |= s.volumeSO2
-	case addr == NR51:
+	case NR51:
 		if s.output4SO2 {
 			value = utils.SetBit(value, 7)
 		}
@@ -284,7 +336,7 @@ func (s *APU) ReadByte(addr uint16) byte {
 		if s.output1SO1 {
 			value = utils.SetBit(value, 0)
 		}
-	case addr == NR52:
+	case NR52:
 		if s.enable {
 			value = utils.SetBit(value, 7)
 		}
@@ -306,35 +358,70 @@ func (s *APU) ReadByte(addr uint16) byte {
 		}
 	}
 
+	if addr >= 0xFF30 && addr <= 0xFF3F {
+		value = s.channel3.ReadByte(addr)
+	}
+	fmt.Printf("Read Byte: Addr: %#x, Value: %#x\n", addr, value|apuReadMask[addr])
 	return value | apuReadMask[addr]
 }
 
 func (s *APU) WriteByte(addr uint16, value byte) {
-	switch {
-	case addr == NR50:
-		s.outputVinSO1 = utils.IsBitSet(value, 3)
-		s.outputVinSO2 = utils.IsBitSet(value, 7)
-		s.volumeSO1 = value & 0x7
-		s.volumeSO2 = value & 0x70
-	case addr == NR51:
-		s.output4SO2 = utils.IsBitSet(value, 7)
-		s.output3SO2 = utils.IsBitSet(value, 6)
-		s.output2SO2 = utils.IsBitSet(value, 5)
-		s.output1SO2 = utils.IsBitSet(value, 4)
-		s.output4SO1 = utils.IsBitSet(value, 3)
-		s.output3SO1 = utils.IsBitSet(value, 2)
-		s.output2SO1 = utils.IsBitSet(value, 1)
-		s.output1SO1 = utils.IsBitSet(value, 0)
-	case addr == NR52:
+	if addr == NR52 {
+		// NR52 controls power to the sound hardware
 		if utils.IsBitSet(value, 7) {
 			s.enable = true
 		} else {
-			// NR52 controls power to the sound hardware. When powered off, all registers (NR10-NR51) are instantly written with zero and any writes to those registers are ignored while power remains off
-			// (except on the DMG, where length counters are unaffected by power and can still be written while off).
-			s.enable = false
-			for addr := NR10; addr < NR52; addr++ {
+			// When powered off, all registers (NR10-NR51) are instantly written with zero
+			// and any writes to those registers are ignored while power remains off
+			for addr := NR10; addr <= NR51; addr++ {
 				s.mmu.WriteByte(uint16(addr), 0x00)
 			}
+			s.enable = false
+		}
+	} else {
+		if s.enable {
+			switch addr {
+			// Square 1 Channel Registers
+			case NR10:
+				s.channel1.WriteSweep(value)
+			case NR11, NR12, NR13:
+				s.channel1.WriteByte(addr, value)
+			case NR14:
+				s.channel1.WriteTriggerByte(value)
+
+			// Square 2 Channel Registers
+			case NR20, NR21, NR22, NR23:
+				s.channel2.WriteByte(addr, value)
+			case NR24:
+				s.channel2.WriteTriggerByte(value)
+
+			// Wave Channel Registers
+			case NR30, NR31, NR32, NR33, NR34:
+				s.channel3.WriteByte(addr, value)
+
+			// Noise Channel Registers
+			case NR40, NR41, NR42, NR43, NR44:
+				s.channel4.WriteByte(addr, value)
+
+			case NR50:
+				s.outputVinSO1 = utils.IsBitSet(value, 3)
+				s.outputVinSO2 = utils.IsBitSet(value, 7)
+				s.volumeSO1 = value & 0x7
+				s.volumeSO2 = value & 0x70
+			case NR51:
+				s.output4SO2 = utils.IsBitSet(value, 7)
+				s.output3SO2 = utils.IsBitSet(value, 6)
+				s.output2SO2 = utils.IsBitSet(value, 5)
+				s.output1SO2 = utils.IsBitSet(value, 4)
+				s.output4SO1 = utils.IsBitSet(value, 3)
+				s.output3SO1 = utils.IsBitSet(value, 2)
+				s.output2SO1 = utils.IsBitSet(value, 1)
+				s.output1SO1 = utils.IsBitSet(value, 0)
+			}
+			if addr >= 0xFF30 && addr <= 0xFF3F {
+				s.channel3.WriteByte(addr, value)
+			}
+			fmt.Printf("Write Byte: Addr: %#x, Value: %#x\n", addr, value)
 		}
 	}
 }

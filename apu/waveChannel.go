@@ -1,43 +1,20 @@
 package apu
 
 import (
-	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/utils"
 )
 
-const (
-	NR30 = 0xFF1A
-	NR31 = 0xFF1B
-	NR32 = 0xFF1C
-	NR33 = 0xFF1D
-	NR34 = 0xFF1E
-)
-
-type Channel3 struct {
+type WaveChannel struct {
 	Channel
 
+	volume   byte
 	position byte
 	buffer   byte
 
 	wavePatternRAM [16]byte
 }
 
-func NewChannel3(mmu *mmu.MMU) *Channel3 {
-	channel := &Channel3{}
-
-	mmu.MapMemory(channel, NR30)
-	mmu.MapMemory(channel, NR31)
-	mmu.MapMemory(channel, NR32)
-	mmu.MapMemory(channel, NR33)
-	mmu.MapMemory(channel, NR34)
-
-	// wavePatternRAM
-	mmu.MapMemoryRange(channel, 0xFF30, 0xFF3F)
-
-	return channel
-}
-
-func (c *Channel3) trigger() {
+func (c *WaveChannel) trigger() {
 	c.enable = true
 
 	if c.length == 0 {
@@ -55,7 +32,7 @@ func (c *Channel3) trigger() {
 	}
 }
 
-func (c *Channel3) Tick(tCycles int) {
+func (c *WaveChannel) Tick(tCycles int) {
 	if c.timer > 0 {
 		c.timer -= tCycles
 	}
@@ -81,7 +58,7 @@ func (c *Channel3) Tick(tCycles int) {
 	}
 }
 
-func (c *Channel3) sample() byte {
+func (c *WaveChannel) sample() byte {
 	if c.enable && c.DACEnable {
 		// The DAC receives the current value from the upper/lower nibble of the
 		// sample buffer, shifted right by the volume control.
@@ -109,7 +86,7 @@ func (c *Channel3) sample() byte {
 
 }
 
-func (c *Channel3) ReadByte(addr uint16) byte {
+func (c *WaveChannel) ReadByte(addr uint16) byte {
 	var value byte
 
 	switch {
@@ -129,10 +106,10 @@ func (c *Channel3) ReadByte(addr uint16) byte {
 		value = c.wavePatternRAM[addr&0xF]
 	}
 
-	return value | apuReadMask[addr]
+	return value
 }
 
-func (c *Channel3) WriteByte(addr uint16, value byte) {
+func (c *WaveChannel) WriteByte(addr uint16, value byte) {
 	switch {
 	case addr == NR30:
 		// Bit 7 - Sound Channel 3 Off  (0=Stop, 1=Playback)

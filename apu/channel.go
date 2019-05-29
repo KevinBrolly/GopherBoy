@@ -61,7 +61,11 @@ func (v *VolumeEnvelope) TickVolumeEnvelope() {
 				}
 			}
 
+			// The volume envelope and sweep timers treat a period of 0 as 8
 			v.volumeEnvelopeTimer = v.volumeEnvelopePeriod
+			if v.volumeEnvelopePeriod == 0 {
+				v.volumeEnvelopeTimer = 8
+			}
 		}
 	}
 }

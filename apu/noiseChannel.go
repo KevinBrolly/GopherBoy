@@ -16,20 +16,33 @@ type NoiseChannel struct {
 	dividingRatio       byte
 }
 
-func (c *NoiseChannel) trigger() {
+func (c *NoiseChannel) trigger(frameSequencerStep int) {
 	// Channel is enabled
 	c.enable = true
 
 	// If length counter is zero, it is set to 64.
 	if c.length == 0 {
 		c.length = 64
+		// If a channel is triggered when the frame sequencer's
+		// next step is one that doesn't clock the length counter
+		// and the length counter is now enabled and length is
+		// being set to 64 (256 for wave channel) because it was
+		// previously zero, it is set to 63 instead (255 for wave channel).
+		if frameSequencerStep%2 != 0 && c.lengthEnable {
+			c.length--
+		}
 	}
 
 	// Frequency timer is reloaded with period.
 	c.timer = c.getDividingRatio() << c.shiftClockFrequency
 
-	// Volume envelope timer is reloaded with period.
+	// Volume envelope timer is reloaded with period
+	// The volume envelope and sweep timers treat a period of 0 as 8
 	c.volumeEnvelopeTimer = c.volumeEnvelopePeriod
+	if c.volumeEnvelopePeriod == 0 {
+		c.volumeEnvelopeTimer = 8
+	}
+
 	// Channel volume is reloaded from NRx2.
 	c.volume = c.volumeEnvelopeInitial
 
@@ -145,15 +158,17 @@ func (c *NoiseChannel) WriteByte(addr uint16, value byte) {
 		c.shiftClockFrequency = value >> 4
 		c.counterWidth = utils.IsBitSet(value, 3)
 		c.dividingRatio = value & 0x7
-	case NR44:
-		// Bit 7   - Initial (1=Restart Sound)
-		// Bit 6   - Counter/consecutive selection
-		// 		  (1=Stop output when length in NR11 expires)
-		c.lengthEnable = utils.IsBitSet(value, 6)
+	}
+}
 
-		// Make sure we trigger after lengthEnable is set
-		if utils.IsBitSet(value, 7) {
-			c.trigger()
-		}
+func (c *NoiseChannel) WriteTriggerByte(value byte, frameSequencerStep int) {
+	// Bit 7   - Initial (1=Restart Sound)
+	// Bit 6   - Counter/consecutive selection
+	// 		  (1=Stop output when length in NR11 expires)
+	c.lengthEnable = utils.IsBitSet(value, 6)
+
+	// Make sure we trigger after lengthEnable is set
+	if utils.IsBitSet(value, 7) {
+		c.trigger(frameSequencerStep)
 	}
 }

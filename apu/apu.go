@@ -360,7 +360,6 @@ func (s *APU) ReadByte(addr uint16) byte {
 	if addr >= 0xFF30 && addr <= 0xFF3F {
 		value = s.channel3.ReadByte(addr)
 	}
-	//fmt.Printf("Read Byte: Addr: %#x, Value: %#x\n", addr, value|apuReadMask[addr])
 	return value | apuReadMask[addr]
 }
 
@@ -373,7 +372,14 @@ func (s *APU) WriteByte(addr uint16, value byte) {
 			// When powered off, all registers (NR10-NR51) are instantly written with zero
 			// and any writes to those registers are ignored while power remains off
 			for addr := NR10; addr <= NR51; addr++ {
-				s.mmu.WriteByte(uint16(addr), 0x00)
+				// TODO: have "If using DMG" or similar here when CGB support is added.
+				// (except on the DMG, where length counters are unaffected by power and can still be written while off)
+				switch addr {
+				case NR11, NR21, NR31, NR41:
+					break
+				default:
+					s.mmu.WriteByte(uint16(addr), 0x00)
+				}
 			}
 			s.enable = false
 		}
@@ -386,21 +392,25 @@ func (s *APU) WriteByte(addr uint16, value byte) {
 			case NR11, NR12, NR13:
 				s.channel1.WriteByte(addr, value)
 			case NR14:
-				s.channel1.WriteTriggerByte(value)
+				s.channel1.WriteTriggerByte(value, s.frameSequencerStep)
 
 			// Square 2 Channel Registers
 			case NR20, NR21, NR22, NR23:
 				s.channel2.WriteByte(addr, value)
 			case NR24:
-				s.channel2.WriteTriggerByte(value)
+				s.channel2.WriteTriggerByte(value, s.frameSequencerStep)
 
 			// Wave Channel Registers
-			case NR30, NR31, NR32, NR33, NR34:
+			case NR30, NR31, NR32, NR33:
 				s.channel3.WriteByte(addr, value)
+			case NR34:
+				s.channel3.WriteTriggerByte(value, s.frameSequencerStep)
 
 			// Noise Channel Registers
-			case NR40, NR41, NR42, NR43, NR44:
+			case NR40, NR41, NR42, NR43:
 				s.channel4.WriteByte(addr, value)
+			case NR44:
+				s.channel4.WriteTriggerByte(value, s.frameSequencerStep)
 
 			case NR50:
 				s.outputVinSO1 = utils.IsBitSet(value, 3)
@@ -420,7 +430,21 @@ func (s *APU) WriteByte(addr uint16, value byte) {
 			if addr >= 0xFF30 && addr <= 0xFF3F {
 				s.channel3.WriteByte(addr, value)
 			}
-			//fmt.Printf("Write Byte: Addr: %#x, Value: %#x\n", addr, value)
+		} else {
+			// TODO: have "If using DMG" or similar here when CGB support is added.
+
+			// When powered off, any writes to all registers (NR10-NR51) are ignored while power remains off
+			// except on the DMG, where length counters are unaffected by power and can still be written while off
+			switch addr {
+			case NR11:
+				s.channel1.WriteByte(addr, value)
+			case NR21:
+				s.channel2.WriteByte(addr, value)
+			case NR31:
+				s.channel3.WriteByte(addr, value)
+			case NR41:
+				s.channel4.WriteByte(addr, value)
+			}
 		}
 	}
 }

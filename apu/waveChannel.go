@@ -14,11 +14,19 @@ type WaveChannel struct {
 	wavePatternRAM [16]byte
 }
 
-func (c *WaveChannel) trigger() {
+func (c *WaveChannel) trigger(frameSequencerStep int) {
 	c.enable = true
 
 	if c.length == 0 {
 		c.length = 256
+		// If a channel is triggered when the frame sequencer's
+		// next step is one that doesn't clock the length counter
+		// and the length counter is now enabled and length is
+		// being set to 64 (256 for wave channel) because it was
+		// previously zero, it is set to 63 instead (255 for wave channel).
+		if frameSequencerStep%2 != 0 && c.lengthEnable {
+			c.length--
+		}
 	}
 
 	c.timer = (2048 - int(c.frequency)) * 2
@@ -37,11 +45,6 @@ func (c *WaveChannel) Tick(tCycles int) {
 		c.timer -= tCycles
 	}
 	if c.timer <= 0 {
-		c.position++
-		if c.position == 32 {
-			c.position = 0
-		}
-
 		// Fill the sample buffer
 		// wavePatternRAM is 16 bytes, position is length 32
 		// position / 2 = wavePatternRAM index
@@ -53,8 +56,14 @@ func (c *WaveChannel) Tick(tCycles int) {
 		} else {
 			c.buffer = wavePatternByte >> 4
 		}
+
 		// Reload timer
 		c.timer = (2048 - int(c.frequency)) * 2
+
+		c.position++
+		if c.position == 32 {
+			c.position = 0
+		}
 	}
 }
 
@@ -92,7 +101,7 @@ func (c *WaveChannel) ReadByte(addr uint16) byte {
 	switch {
 	case addr == NR30:
 		// Bit 7 - Sound Channel 3 Off  (0=Stop, 1=Playback)
-		if c.enable {
+		if c.DACEnable {
 			value = utils.SetBit(value, 7)
 		}
 	case addr == NR32:
@@ -103,7 +112,13 @@ func (c *WaveChannel) ReadByte(addr uint16) byte {
 			value = utils.SetBit(value, 6)
 		}
 	case addr >= 0xFF30 && addr <= 0xFF3F:
-		value = c.wavePatternRAM[addr&0xF]
+		// If the wave channel is enabled, accessing any byte from $FF30-$FF3F is equivalent
+		// to accessing the current byte selected by the waveform position.
+		if c.enable {
+			value = c.wavePatternRAM[c.position]
+		} else {
+			value = c.wavePatternRAM[addr&0xF]
+		}
 	}
 
 	return value
@@ -127,20 +142,30 @@ func (c *WaveChannel) WriteByte(addr uint16, value byte) {
 		c.volume = (value >> 5) & 0x3
 	case addr == NR33:
 		c.writeFrequencyLowerBits(value)
-	case addr == NR34:
-		// Bit 7   - Initial (1=Restart Sound)
-		// Bit 6   - Counter/consecutive selection
-		// 		  (1=Stop output when length in NR34 expires)
-		// Bit 2-0 - Frequency's higher 3 bits (x)
-		c.lengthEnable = utils.IsBitSet(value, 6)
-
-		c.writeFrequencyHigherBits(value)
-
-		// Make sure we trigger after the lengthEnable and Higher frequency bits are set
-		if utils.IsBitSet(value, 7) {
-			c.trigger()
-		}
 	case addr >= 0xFF30 && addr <= 0xFF3F:
-		c.wavePatternRAM[addr&0xF] = value
+		// If the wave channel is enabled, accessing any byte from $FF30-$FF3F is equivalent
+		// to accessing the current byte selected by the waveform position.
+		// On the DMG accesses will only work in this manner if made within a couple of clocks
+		// of the wave channel accessing wave RAM; if made at any other time, reads return $FF and writes have no effect.
+		if c.enable {
+			c.wavePatternRAM[c.position] = value
+		} else {
+			c.wavePatternRAM[addr&0xF] = value
+		}
+	}
+}
+
+func (c *WaveChannel) WriteTriggerByte(value byte, frameSequencerStep int) {
+	// Bit 7   - Initial (1=Restart Sound)
+	// Bit 6   - Counter/consecutive selection
+	// 		  (1=Stop output when length in NR34 expires)
+	// Bit 2-0 - Frequency's higher 3 bits (x)
+	c.lengthEnable = utils.IsBitSet(value, 6)
+
+	c.writeFrequencyHigherBits(value)
+
+	// Make sure we trigger after the lengthEnable and Higher frequency bits are set
+	if utils.IsBitSet(value, 7) {
+		c.trigger(frameSequencerStep)
 	}
 }

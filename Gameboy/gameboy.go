@@ -96,8 +96,8 @@ func (gameboy *Gameboy) Run() {
 		for cyclesThisUpdate < MAXCYCLES {
 			cycles := gameboy.CPU.Step()
 			gameboy.PPU.Step(cycles)
-			gameboy.APU.Tick(int(cycles))
-			cyclesThisUpdate += int(cycles * 4)
+			gameboy.APU.Tick(cycles)
+			cyclesThisUpdate += cycles
 
 			// fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %#x, IF: %#x, LCDC: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n",
 			// 	gameboy.CPU.GetOpcode(),

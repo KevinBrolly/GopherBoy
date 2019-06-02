@@ -49,12 +49,12 @@ func (timer *Timer) Reset() {
 	timer.dividerCounter = 0
 }
 
-func (timer *Timer) Tick(cycles byte) {
+func (timer *Timer) Tick(cycles int) {
 	timer.updateDividerRegister(cycles)
 
 	if utils.IsBitSet(timer.TAC, TIMER_STOP) {
 
-		timer.timerCounter += int(cycles)
+		timer.timerCounter += cycles
 
 		var threshold int
 		frequency := timer.getClockFrequency()
@@ -92,9 +92,9 @@ func (timer *Timer) Tick(cycles byte) {
 	}
 }
 
-func (timer *Timer) updateDividerRegister(cycles byte) {
+func (timer *Timer) updateDividerRegister(cycles int) {
 	// Divider uses MCycles
-	timer.dividerCounter += int(cycles * 4)
+	timer.dividerCounter += cycles
 
 	if timer.dividerCounter >= 255 {
 		timer.dividerCounter = 0

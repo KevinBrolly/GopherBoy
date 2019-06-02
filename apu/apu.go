@@ -159,16 +159,14 @@ func NewAPU(mmu *mmu.MMU) *APU {
 	return apu
 }
 
-func (s *APU) Tick(mCycles int) {
-	tCycles := mCycles * 4
-
-	s.channel1.Tick(tCycles)
-	s.channel2.Tick(tCycles)
-	s.channel3.Tick(tCycles)
-	s.channel4.Tick(tCycles)
+func (s *APU) Tick(cycles int) {
+	s.channel1.Tick(cycles)
+	s.channel2.Tick(cycles)
+	s.channel3.Tick(cycles)
+	s.channel4.Tick(cycles)
 
 	if s.frameSequencerTimer > 0 {
-		s.frameSequencerTimer = s.frameSequencerTimer - tCycles
+		s.frameSequencerTimer = s.frameSequencerTimer - cycles
 	}
 
 	if s.frameSequencerTimer <= 0 {
@@ -176,7 +174,7 @@ func (s *APU) Tick(mCycles int) {
 	}
 
 	if s.sampleTimer > 0 {
-		s.sampleTimer = s.sampleTimer - tCycles
+		s.sampleTimer = s.sampleTimer - cycles
 	}
 
 	if s.sampleTimer <= 0 {

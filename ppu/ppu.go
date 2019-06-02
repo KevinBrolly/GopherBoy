@@ -297,9 +297,9 @@ func (ppu *PPU) setLCDCFields(value byte) {
 	ppu.backgroundEnabled = utils.IsBitSet(value, 0)
 }
 
-func (ppu *PPU) Step(cycles byte) {
+func (ppu *PPU) Step(cycles int) {
 	if ppu.lcdEnabled {
-		ppu.Cycles += int(cycles * 4)
+		ppu.Cycles += cycles
 
 		// STAT indicates the current status of the LCD controller.
 		switch ppu.STAT.mode {
@@ -335,7 +335,7 @@ func (ppu *PPU) Step(cycles byte) {
 		// VBlank
 		// After 10 lines, restart scanline and draw the next frame
 		case MODE1:
-			if ppu.Cycles >= 4560 {
+			if ppu.Cycles >= 456 {
 				// Reset the cycle counter
 				ppu.Cycles = 0
 

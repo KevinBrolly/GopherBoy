@@ -119,7 +119,7 @@ func UnimplementedInstruction(cpu *CPU) {
 	os.Exit(1)
 }
 
-func (cpu *CPU) Step() (cycles byte) {
+func (cpu *CPU) Step() (cycles int) {
 	if !cpu.Halt {
 		initialPC := cpu.PC
 
@@ -128,7 +128,7 @@ func (cpu *CPU) Step() (cycles byte) {
 		instruction := cpu.getInstruction(opcode)
 		cpu.CurrentInstruction = instruction
 
-		cycles = instruction.Execute(cpu)
+		cycles = int(instruction.Execute(cpu))
 
 		// The && opcode != 0x18 is a quick hack to stop a bug whereby in opcode 0x18 it is possible
 		// to end up with initalPC and cpu.PC being equal even when the instruction has completed
@@ -146,7 +146,7 @@ func (cpu *CPU) Step() (cycles byte) {
 	cpu.timer.Tick(cycles)
 	cpu.handleInterrupts()
 
-	return cycles
+	return cycles * 4
 }
 
 func (cpu *CPU) handleInterrupts() {

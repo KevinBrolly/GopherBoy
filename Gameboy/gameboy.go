@@ -70,8 +70,9 @@ func (gameboy *Gameboy) LoadCartridgeData(filename string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	switch data[0x147] {
+	case 0:
+		gameboy.MBC = mmu.NewMBC0(gameboy.MMU, data)
 	case 1:
 		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
 	case 2:

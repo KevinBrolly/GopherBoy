@@ -28,6 +28,18 @@ const (
 	OBP1 = 0xFF49 // Object/Sprite Background Palette 1
 	WY   = 0xFF4A // Window Y
 	WX   = 0xFF4B // Window X
+
+	// Color-related Addresses
+	VRAMBank = 0xFF4F // VRAM Bank
+	BGPI     = 0xFF68 // Background Palette Index
+	BGPD     = 0xFF69 // Background Palette Data
+	OBPI     = 0xFF6A // Sprite Palette Index
+	OBPD     = 0xFF6B // Sprite Palette Data
+	HDMA1    = 0xFF51 // New DMA Source, High
+	HDMA3    = 0xFF53 // New DMA Destination, High
+	HDMA2    = 0xFF52 // New DMA Source, Low
+	HDMA4    = 0xFF54 // New DMA Destination, Low
+	HDMA5    = 0xFF55 // New DMA Length/Mode/Start
 )
 
 const (
@@ -36,6 +48,16 @@ const (
 	MODE2 = 0x02 // OAM Access
 	MODE3 = 0x03 // VRAM Acess
 )
+
+type palette struct {
+	colors [3]color
+}
+
+type color struct {
+	red   byte
+	green byte
+	blue  byte
+}
 
 type stat struct {
 	coincidenceInterruptEnabled bool
@@ -92,8 +114,9 @@ type PPU struct {
 
 	Window *Window
 
-	VRAM [16384]byte
-	OAM  [160]byte
+	VRAM     [16384]byte
+
+	OAM [160]byte
 
 	STAT *stat // LCD Status/Mode
 	SCY  byte  // Scroll Y
@@ -106,6 +129,29 @@ type PPU struct {
 	OBP1 byte
 	WY   byte // Window Y
 	WX   byte // Window X
+
+	// Color-related Addresses
+	VRAMBank byte // VRAM Bank
+
+	// FF68 - BCPS/BGPI - CGB Mode Only - Background Palette Index
+	backgroundPaletteIndex         byte
+	backgroundPaletteAutoIncrement bool
+
+	// FF69 - BCPD/BGPD - CGB Mode Only - Background Palette Data
+	backgroundPaletteData [0x40]byte
+
+	// FF6A - OCPS/OBPI - CGB Mode Only - Sprite Palette Index
+	SpritePaletteIndex [0x40]byte
+	SpritePaletteAutoIncrement bool
+
+	// FF6B - OCPD/OBPD - CGB Mode Only - Sprite Palette Data
+	SpritePaletteData  [0x40]byte
+
+	HDMA1 byte // New DMA Source, High
+	HDMA3 byte // New DMA Destination, High
+	HDMA2 byte // New DMA Source, Low
+	HDMA4 byte // New DMA Destination, Low
+	HDMA5 byte // New DMA Length/Mode/Start
 
 	// LCD Control byte
 	LCDC byte
@@ -206,6 +252,26 @@ func (ppu *PPU) ReadByte(addr uint16) byte {
 		return ppu.WY
 	case addr == WX:
 		return ppu.WX
+	case addr == VRAMBank:
+		return ppu.VRAMBank
+	case addr == BGPI:
+		var value byte
+		value = ppu.backgroundPaletteIndex
+		if ppu.backgroundPaletteAutoIncrement {
+			utils.SetBit(value, 7)
+		}
+		return value
+	case addr == BGPD:
+		return ppu.backgroundPaletteData[ppu.backgroundPaletteIndex]
+	case addr == OBPI:
+		var value byte
+		value = ppu.spritePaletteIndex
+		if ppu.spritePaletteAutoIncrement {
+			utils.SetBit(value, 7)
+		}
+		return value
+	case addr == OBPD:
+		return ppu.spritePaletteData[ppu.spritePaletteIndex]
 	case addr >= 0x8000 && addr <= 0x9FFF:
 		return ppu.VRAM[addr&0x1FFF]
 	case addr >= 0xFE00 && addr <= 0xFE9F:
@@ -248,6 +314,15 @@ func (ppu *PPU) WriteByte(addr uint16, value byte) {
 		ppu.WY = value
 	case addr == WX:
 		ppu.WX = value
+	case addr == VRAMBank:
+		ppu.VRAMBank = value
+	case addr == BGPI:
+		ppu.backgroundPaletteIndex = value & 0x1F
+		if utils.IsBitSet(value, 7) {
+			ppu.backgroundPaletteAutoIncrement = true
+		}
+	case addr == BGPD:
+		ppu.backgroundPaletteData[ppu.backgroundPaletteIndex] = value
 	case addr >= 0x8000 && addr <= 0x9FFF:
 		ppu.VRAM[addr&0x1FFF] = value
 	}

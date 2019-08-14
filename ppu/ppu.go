@@ -141,11 +141,11 @@ type PPU struct {
 	backgroundPaletteData [0x40]byte
 
 	// FF6A - OCPS/OBPI - CGB Mode Only - Sprite Palette Index
-	SpritePaletteIndex [0x40]byte
-	SpritePaletteAutoIncrement bool
+	spritePaletteIndex byte
+	spritePaletteAutoIncrement bool
 
 	// FF6B - OCPD/OBPD - CGB Mode Only - Sprite Palette Data
-	SpritePaletteData  [0x40]byte
+	spritePaletteData [0x40]byte
 
 	HDMA1 byte // New DMA Source, High
 	HDMA3 byte // New DMA Destination, High

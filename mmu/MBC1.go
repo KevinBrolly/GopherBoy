@@ -42,8 +42,10 @@ func (mbc *MBC1) ReadByte(addr uint16) byte {
 		addr := addr - 0x4000
 		return mbc.CartridgeData[int(addr)+(int(mbc.CurrentROMBank)*0x4000)]
 	case addr >= 0xA000 && addr <= 0xBFFF:
-		addr := addr - 0xA000
-		return mbc.RAM[int(addr)+mbc.CurrentRAMBank*0x2000]
+		if mbc.RAMEnabled {
+			addr := addr - 0xA000
+			return mbc.RAM[int(addr)+mbc.CurrentRAMBank*0x2000]
+		}
 	}
 
 	return 0
@@ -60,14 +62,20 @@ func (mbc *MBC1) WriteByte(addr uint16, value byte) {
 		}
 	case addr >= 0x2000 && addr <= 0x3FFF:
 		mbc.CurrentROMBank = int(value & 0x1F)
-		// When 0 is written, the MBC translates that to Bank 1
-		// This is fine because ROM Bank 0 can be always directly accessed by reading from 0000-3FFF
+		// When 00h is written, the MBC translates that to bank 01h also the same happens for Bank 20h, 40h, and 60h.
+		// Any attempt to address these ROM Banks will select Bank 21h, 41h, and 61h instead.
+		if mbc.CurrentROMBank == 0x00 || mbc.CurrentROMBank == 0x20 || mbc.CurrentROMBank == 0x40 || mbc.CurrentROMBank == 0x60 {
+			mbc.CurrentROMBank++
+		}
 	case addr >= 0x4000 && addr <= 0x5FFF:
 		switch mbc.BankingMode {
 		case ROMBankingMode:
 			mbc.CurrentROMBank = int(value & 0xE0)
-			// When 0 is written, the MBC translates that to Bank 1
-			// This is fine because ROM Bank 0 can be always directly accessed by reading from 0000-3FFF
+			// When 00h is written, the MBC translates that to bank 01h also the same happens for Bank 20h, 40h, and 60h.
+			// Any attempt to address these ROM Banks will select Bank 21h, 41h, and 61h instead.
+			if mbc.CurrentROMBank == 0x00 || mbc.CurrentROMBank == 0x20 || mbc.CurrentROMBank == 0x40 || mbc.CurrentROMBank == 0x60 {
+				mbc.CurrentROMBank++
+			}
 		case RAMBankingMode:
 			mbc.CurrentRAMBank = int(value & 0x3)
 		}

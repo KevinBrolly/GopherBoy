@@ -2,6 +2,7 @@ package gameboy
 
 import (
 	"fmt"
+	"image"
 	"io/ioutil"
 	"log"
 	"time"
@@ -20,7 +21,12 @@ const (
 	DMG_STATUS_REGISTER = 0xFF50 // Signals that the boot ROM has finished
 )
 
+type Window interface {
+	DrawFrame(frameBuffer *image.RGBA)
+}
+
 type Gameboy struct {
+	Window     Window
 	MMU        *mmu.MMU
 	MBC        mmu.Memory
 	CPU        *cpu.CPU
@@ -37,7 +43,7 @@ type Gameboy struct {
 	running bool
 }
 
-func NewGameboy() (gameboy *Gameboy) {
+func NewGameboy(window Window) (gameboy *Gameboy) {
 	mmu := mmu.NewMMU()
 	cpu := cpu.NewCPU(mmu)
 	ppu := ppu.NewPPU(mmu)
@@ -45,6 +51,7 @@ func NewGameboy() (gameboy *Gameboy) {
 	controller := control.NewController(mmu)
 
 	gameboy = &Gameboy{
+		Window:     window,
 		MMU:        mmu,
 		CPU:        cpu,
 		PPU:        ppu,
@@ -121,7 +128,6 @@ func (gameboy *Gameboy) Run() {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch e := event.(type) {
 			case *sdl.QuitEvent:
-				gameboy.PPU.Window.Quit()
 				gameboy.Quit()
 
 			case *sdl.KeyboardEvent:
@@ -143,7 +149,6 @@ func (gameboy *Gameboy) Run() {
 						gameboy.Controller.KeyPressed(control.SELECT)
 					case sdl.K_RETURN:
 						gameboy.Controller.KeyPressed(control.START)
-
 					}
 				} else if e.Type == sdl.KEYUP {
 					switch e.Keysym.Sym {
@@ -169,7 +174,7 @@ func (gameboy *Gameboy) Run() {
 			}
 		}
 
-		gameboy.PPU.Window.Update()
+		gameboy.Window.DrawFrame(gameboy.PPU.FrameBuffer)
 		frames++
 		since := time.Since(start)
 		if since > time.Second {

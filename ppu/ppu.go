@@ -1,15 +1,12 @@
 package ppu
 
 import (
+	"image"
+	"image/color"
+	"image/draw"
+
 	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/utils"
-
-	"github.com/veandco/go-sdl2/sdl"
-)
-
-const (
-	WIDTH  = 160
-	HEIGHT = 144
 )
 
 const (
@@ -48,16 +45,6 @@ const (
 	MODE2 = 0x02 // OAM Access
 	MODE3 = 0x03 // VRAM Acess
 )
-
-type palette struct {
-	colors [3]color
-}
-
-type color struct {
-	red   byte
-	green byte
-	blue  byte
-}
 
 type stat struct {
 	coincidenceInterruptEnabled bool
@@ -112,11 +99,12 @@ func (s *stat) getStat() byte {
 type PPU struct {
 	mmu *mmu.MMU
 
-	Window *Window
+	FrameBuffer *image.RGBA
 
-	VRAM     [16384]byte
+	VRAM [16384]byte
 
-	OAM [160]byte
+	OAM            []*Sprite
+	VisibleSprites []*Sprite
 
 	STAT *stat // LCD Status/Mode
 	SCY  byte  // Scroll Y
@@ -141,7 +129,7 @@ type PPU struct {
 	backgroundPaletteData [0x40]byte
 
 	// FF6A - OCPS/OBPI - CGB Mode Only - Sprite Palette Index
-	spritePaletteIndex byte
+	spritePaletteIndex         byte
 	spritePaletteAutoIncrement bool
 
 	// FF6B - OCPD/OBPD - CGB Mode Only - Sprite Palette Data
@@ -182,11 +170,21 @@ type pixelAttributes struct {
 }
 
 func NewPPU(mmu *mmu.MMU) *PPU {
-	window := NewWindow("Gameboy", WIDTH, HEIGHT)
+
+	rectImage := image.NewRGBA(image.Rect(0, 0, 160, 144))
+	draw.Draw(rectImage, rectImage.Bounds(), &image.Uniform{color.Black}, image.ZP, draw.Src)
+
+	oam := make([]*Sprite, 40)
+
+	for i := range oam {
+		oam[i] = &Sprite{}
+	}
 
 	ppu := &PPU{
-		mmu:    mmu,
-		Window: window,
+		mmu:            mmu,
+		OAM:            oam,
+		VisibleSprites: make([]*Sprite, 10),
+		FrameBuffer:    rectImage,
 		STAT: &stat{
 			coincidenceInterruptEnabled: false,
 			oamInterruptEnabled:         false,
@@ -275,7 +273,20 @@ func (ppu *PPU) ReadByte(addr uint16) byte {
 	case addr >= 0x8000 && addr <= 0x9FFF:
 		return ppu.VRAM[addr&0x1FFF]
 	case addr >= 0xFE00 && addr <= 0xFE9F:
-		return ppu.OAM[addr&0x9F]
+		oamAddr := addr & 0x9F
+		sprite := ppu.OAM[oamAddr/4] // 4 bits per sprite
+		spriteBit := oamAddr % 4
+
+		switch spriteBit {
+		case 0:
+			return sprite.Y
+		case 1:
+			return sprite.X
+		case 2:
+			return sprite.TileNumber
+		case 3:
+			return sprite.Attributes
+		}
 	}
 	return 0
 }
@@ -300,9 +311,12 @@ func (ppu *PPU) WriteByte(addr uint16, value byte) {
 		// The value holds the source address of the OAM data divided by 100
 		// so we have to multiply it first
 		var sourceAddr uint16 = uint16(value) << 8
-
-		for i := 0; i < 160; i++ {
-			ppu.OAM[i] = ppu.mmu.ReadByte(sourceAddr + uint16(i))
+		for _, sprite := range ppu.OAM {
+			sprite.Y = ppu.mmu.ReadByte(sourceAddr)
+			sprite.X = ppu.mmu.ReadByte(sourceAddr + 1)
+			sprite.TileNumber = ppu.mmu.ReadByte(sourceAddr + 2)
+			sprite.Attributes = ppu.mmu.ReadByte(sourceAddr + 3)
+			sourceAddr = sourceAddr + 4
 		}
 	case addr == BGP:
 		ppu.BGP = value
@@ -325,6 +339,21 @@ func (ppu *PPU) WriteByte(addr uint16, value byte) {
 		ppu.backgroundPaletteData[ppu.backgroundPaletteIndex] = value
 	case addr >= 0x8000 && addr <= 0x9FFF:
 		ppu.VRAM[addr&0x1FFF] = value
+	case addr >= 0xFE00 && addr <= 0xFE9F:
+		oamAddr := addr & 0x9F
+		sprite := ppu.OAM[oamAddr/4] // 4 bits per sprite
+		spriteBit := oamAddr % 4
+
+		switch spriteBit {
+		case 0:
+			sprite.Y = value
+		case 1:
+			sprite.X = value
+		case 2:
+			sprite.TileNumber = value
+		case 3:
+			sprite.Attributes = value
+		}
 	}
 }
 
@@ -434,6 +463,8 @@ func (ppu *PPU) Step(cycles int) {
 		// OAM access mode, scanline active
 		case MODE2:
 			if ppu.Cycles >= 80 {
+				// Do OAMSearch
+				ppu.OAMSearch()
 				// Reset the cycle counter
 				ppu.Cycles = 0
 				// Enter GPU Mode 3
@@ -477,241 +508,81 @@ func (ppu *PPU) Step(cycles int) {
 	}
 }
 
-func (ppu *PPU) generateTileScanline() [160]*pixelAttributes {
-	var scanline [160]*pixelAttributes
+func (ppu *PPU) OAMSearch() {
+	visibleSprites := make([]*Sprite, 0)
 
-	windowEnabled := false
-	if ppu.windowEnabled {
-		if ppu.WY <= ppu.LY {
-			windowEnabled = true
+	for _, sprite := range ppu.OAM {
+		if len(visibleSprites) == 10 {
+			break
+		}
+
+		if sprite.X != 0 && ((ppu.LY + 16) >= sprite.Y) && ((ppu.LY + 16) < (sprite.Y + ppu.spriteSize)) {
+			visibleSprites = append(visibleSprites, sprite)
 		}
 	}
 
-	tileMap := ppu.backgroundMapLocation
-	pixelY := ppu.LY + ppu.SCY
-
-	if windowEnabled {
-		tileMap = ppu.windowMapLocation
-		// Add ScrollY to the Scanline to get the current pixel Y position
-		pixelY = ppu.LY - ppu.WY
-	}
-
-	for pixel := byte(0); pixel < 160; pixel++ {
-		// Add pixel being drawn in scanline to scrollX to get the current pixel X position
-		pixelX := pixel + ppu.SCX
-
-		// translate the current x pos to window space if necessary
-		if windowEnabled {
-			if pixel >= ppu.WX {
-				pixelX = pixel - (ppu.WX - 7)
-			}
-		}
-
-		colorIdentifier := ppu.getTileColorIdentifierForPixel(tileMap, pixelX, pixelY)
-
-		scanline[pixel] = &pixelAttributes{
-			colorIdentifier: colorIdentifier,
-			palette:         ppu.BGP,
-		}
-	}
-
-	return scanline
-}
-
-func (ppu *PPU) generateSpriteScanline() [160]*pixelAttributes {
-	var scanline [160]*pixelAttributes
-
-	for sprite := 0; sprite < 40; sprite++ {
-		index := sprite * 4
-		yPos := ppu.OAM[index] - 16
-		xPos := ppu.OAM[index+1] - 8
-		characterCode := ppu.OAM[index+2]
-		attributes := ppu.OAM[index+3]
-
-		yFlip := utils.IsBitSet(attributes, 6)
-		xFlip := utils.IsBitSet(attributes, 5)
-
-		if (ppu.LY >= yPos) && (ppu.LY < (yPos + ppu.spriteSize)) {
-			line := int(ppu.LY - yPos)
-
-			if yFlip {
-				line -= int(ppu.spriteSize)
-				line *= -1
-			}
-
-			line *= 2 // same as for tiles
-
-			data1, data2 := ppu.getSpriteDataForLine(characterCode, line)
-
-			// its easier to read in from right to left as pixel 0 is
-			// bit 7 in the colour data, pixel 1 is bit 6 etc...
-			for tilePixel := 7; tilePixel >= 0; tilePixel-- {
-				pixelBit := tilePixel
-				// read the sprite in backwards for the x axis
-				if xFlip {
-					pixelBit -= 7
-					pixelBit *= -1
-				}
-
-				var colorIdentifier byte
-				if utils.IsBitSet(data1, byte(pixelBit)) {
-					colorIdentifier = utils.SetBit(colorIdentifier, 0)
-				}
-				if utils.IsBitSet(data2, byte(pixelBit)) {
-					colorIdentifier = utils.SetBit(colorIdentifier, 1)
-				}
-
-				pixel := int(xPos) + (7 - tilePixel)
-
-				var palette byte
-				if utils.IsBitSet(attributes, 4) {
-					palette = ppu.OBP1
-				} else {
-					palette = ppu.OBP0
-				}
-
-				prioritySet := utils.IsBitSet(attributes, 7)
-				var priority byte
-				if prioritySet {
-					priority = 1
-				}
-
-				if (pixel >= 0) && (pixel <= 159) && colorIdentifier != 0 {
-					scanline[pixel] = &pixelAttributes{
-						colorIdentifier: colorIdentifier,
-						palette:         palette,
-						priority:        priority,
-					}
-				}
-			}
-		}
-	}
-	return scanline
+	ppu.VisibleSprites = visibleSprites
 }
 
 func (ppu *PPU) renderScanline() {
 	if ppu.backgroundEnabled {
 
-		var scanline [2][160]*pixelAttributes
-		scanline[0] = ppu.generateTileScanline()
+		fifo := &Fifo{}
 
-		if ppu.spriteEnabled {
-			scanline[1] = ppu.generateSpriteScanline()
+		fetcher := &Fetcher{
+			tileMapAddress:  ppu.backgroundMapLocation,
+			tileDataAddress: ppu.tileDataLocation,
+			SCY:             ppu.SCY,
+			LY:              ppu.LY,
+			memory:          ppu.mmu,
 		}
 
-		for x := 0; x < 160; x++ {
-			var pixel uint32
-			backgroundPixel := scanline[0][x]
-			spritePixel := scanline[1][x]
-
-			// If there is a sprite at this position in the scanline
-			// and the sprite priority is 0 or the background pixels
-			// colorIdentifier is 0, then the sprite is rendered on top
-			// of the background, otherwise the background is rendered.
-			if spritePixel != nil && (spritePixel.priority == 0 || backgroundPixel.colorIdentifier == 0) {
-				pixel = ppu.applyPalette(spritePixel.colorIdentifier, spritePixel.palette)
-			} else {
-				pixel = ppu.applyPalette(backgroundPixel.colorIdentifier, backgroundPixel.palette)
+		x := 0
+		pushedDots := 0
+		for pushedDots <= 160 {
+			if fifo.Length() <= 8 {
+				fifo.PushDots(fetcher.NextTileLine())
 			}
 
-			ppu.Window.Framebuffer[x+160*int(ppu.LY)] = pixel
+			xSprites := make([]*Sprite, 0)
+			for _, sprite := range ppu.VisibleSprites {
+				if sprite != nil && int(sprite.X-8) == x {
+					xSprites = append(xSprites, sprite)
+				}
+			}
+			if len(xSprites) != 0 {
+				sprite := xSprites[len(xSprites)-1]
+				dots := fetcher.fetchSpriteLine(sprite)
+				fifo.OverlaySprite(dots, sprite.Palette(), sprite.Priority(), sprite.X)
+			}
+
+			if ppu.windowEnabled {
+				if ppu.WY <= ppu.LY {
+					if ppu.WX == byte(x) {
+						fifo.Clear()
+						fetcher.tileMapAddress = ppu.windowMapLocation
+						fifo.PushDots(fetcher.NextTileLine())
+					}
+				}
+			}
+
+			dot := fifo.PopDot()
+
+			palette := ppu.BGP
+			if dot.Type == SPRITE {
+				if dot.Palette == 0 {
+					palette = ppu.OBP0
+				} else {
+					palette = ppu.OBP1
+				}
+			}
+
+			if ppu.SCX <= byte(x) {
+				ppu.FrameBuffer.SetRGBA(pushedDots, int(ppu.LY), dot.ToRGBA(palette))
+				pushedDots++
+			}
+
+			x++
 		}
 	}
-}
-
-func (ppu *PPU) getTileColorIdentifierForPixel(tileMap uint16, pixelX byte, pixelY byte) byte {
-	tileIdentifier := ppu.getTileIdentifierForPixel(tileMap, pixelX, pixelY)
-	tileDataAddress := ppu.getTileDataAddress(ppu.tileDataLocation, tileIdentifier)
-
-	// Find the correct vertical line we're on of the
-	// tile to get the tile data from memory
-	line := pixelY % 8
-	line = line * 2 // each vertical line takes up two bytes of memory
-
-	data1 := ppu.mmu.ReadByte(tileDataAddress + uint16(line))
-	data2 := ppu.mmu.ReadByte(tileDataAddress + uint16(line) + 1)
-
-	// pixel 0 in the tile is it 7 of data 1 and data2.
-	// Pixel 1 is bit 6 etc..
-	pixelBit := int(pixelX % 8)
-	pixelBit -= 7
-	pixelBit *= -1
-
-	var colorIdentifier byte
-	if utils.IsBitSet(data1, byte(pixelBit)) {
-		colorIdentifier = utils.SetBit(colorIdentifier, 0)
-	}
-	if utils.IsBitSet(data2, byte(pixelBit)) {
-		colorIdentifier = utils.SetBit(colorIdentifier, 1)
-	}
-
-	return colorIdentifier
-}
-
-func (ppu *PPU) getTileIdentifierForPixel(tileMap uint16, pixelX byte, pixelY byte) byte {
-	// Divide the pixelY position by 8 (for 8 pixels in tile)
-	// and multiply by 32 (for number of tiles in the background map)
-	// to get the row number for the tile in the background map
-	tileRow := uint16(pixelY/8) * 32
-
-	// Divide the pixelX position by 8 (for 8 tiles in horizontal row)
-	// to get the column number for the tile in the background map
-	tileCol := uint16(pixelX / 8)
-
-	return ppu.mmu.ReadByte(tileMap + tileRow + tileCol)
-}
-
-func (ppu *PPU) getTileDataAddress(tileMap uint16, tileIdentifier byte) uint16 {
-	// When the tileMap used is 0x8800 the tileIndentifier is
-	// a signed byte -127 - 127, the offset corrects for this
-	// when looking up the memory location
-	offset := uint16(0)
-	if tileMap == 0x8800 {
-		offset = 128
-	}
-
-	if tileIdentifier > 127 {
-		return tileMap + (uint16(tileIdentifier)-offset)*16 // 16 = tile size in bytes
-	} else {
-		return tileMap + (uint16(tileIdentifier)+offset)*16 // 16 = tile size in bytes
-
-	}
-}
-
-func (ppu *PPU) getSpriteDataForLine(characterCode byte, line int) (byte, byte) {
-	spriteDataStorage := 0x8000
-	spriteDataAddress := spriteDataStorage + (int(characterCode) * 16) + line // 16 = obj size in bytes
-
-	data1 := ppu.mmu.ReadByte(uint16(spriteDataAddress))
-	data2 := ppu.mmu.ReadByte(uint16(spriteDataAddress + 1))
-
-	return data1, data2
-}
-
-func (ppu *PPU) applyPalette(colorIdentifier byte, palette byte) uint32 {
-	pixelFormat, _ := sdl.AllocFormat(uint(sdl.PIXELFORMAT_RGBA32))
-	var color byte
-	var bitmask byte = 0x3
-	switch colorIdentifier {
-	case 0:
-		color = palette & bitmask
-	case 1:
-		color = (palette >> 2) & bitmask
-	case 2:
-		color = (palette >> 4) & bitmask
-	case 3:
-		color = (palette >> 6) & bitmask
-	}
-
-	switch color {
-	case 0:
-		return sdl.MapRGB(pixelFormat, 224, 248, 208)
-	case 1:
-		return sdl.MapRGB(pixelFormat, 136, 192, 112)
-	case 2:
-		return sdl.MapRGB(pixelFormat, 52, 104, 86)
-	case 3:
-		return sdl.MapRGB(pixelFormat, 8, 24, 32)
-	}
-	return 0
 }

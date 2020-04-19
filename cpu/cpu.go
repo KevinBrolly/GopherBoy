@@ -122,9 +122,7 @@ func UnimplementedInstruction(cpu *CPU) {
 func (cpu *CPU) Step() (cycles int) {
 	if !cpu.Halt {
 		initialPC := cpu.PC
-
 		var opcode byte = cpu.GetOpcode()
-
 		instruction := cpu.getInstruction(opcode)
 		cpu.CurrentInstruction = instruction
 
@@ -135,7 +133,7 @@ func (cpu *CPU) Step() (cycles int) {
 		// successfully, and therefore adding the CurrentInstruction.Length leaves us with an incorrect
 		// cpu.PC value.
 		// TODO: Refactor CPU instructions to increment PC themselves.
-		if initialPC == cpu.PC && opcode != 0x18 {
+		if initialPC == cpu.PC && opcode != 0x18 && opcode != 0x20 {
 			cpu.PC += cpu.CurrentInstruction.Length
 		}
 	} else {

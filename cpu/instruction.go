@@ -1,6 +1,8 @@
 package cpu
 
-import "github.com/kevinbrolly/GopherBoy/utils"
+import (
+	"github.com/kevinbrolly/GopherBoy/utils"
+)
 
 type Instruction struct {
 	Opcode      byte
@@ -2067,8 +2069,6 @@ func (cpu *CPU) BIT_b_HL(bit byte) (cycles byte) {
 		cpu.SetFlag(Z)
 	}
 
-	cpu.mmu.WriteByte(HL, value)
-
 	return 3
 }
 
@@ -2147,13 +2147,13 @@ func (cpu *CPU) JR_e() (cycles byte) {
 // JR cc,e | 3/2 | ---- | if cc true, PC=PC+e
 func (cpu *CPU) JR_cc_e(conditionCode int) (cycles byte) {
 	e := cpu.GetByteOffset(1)
+
+	cpu.PC += cpu.CurrentInstruction.Length
+
 	if ((conditionCode == CC_NZ) && !cpu.IsFlagSet(Z)) ||
 		((conditionCode == CC_Z) && cpu.IsFlagSet(Z)) ||
 		((conditionCode == CC_NC) && !cpu.IsFlagSet(CY)) ||
 		((conditionCode == CC_C) && cpu.IsFlagSet(CY)) {
-
-		// Set PC to next instruction
-		cpu.PC += 2
 
 		if e > 127 {
 			cpu.PC -= uint16(-e)

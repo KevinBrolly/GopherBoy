@@ -8,7 +8,6 @@ const (
 type MBC1 struct {
 	mmu            *MMU
 	CartridgeData  []byte
-	ROM            []byte
 	RAM            []byte
 	RAMEnabled     bool
 	CurrentROMBank int
@@ -38,11 +37,6 @@ func (mbc *MBC1) ReadByte(addr uint16) byte {
 	case addr >= 0x0000 && addr <= 0x3FFF:
 		return mbc.CartridgeData[addr]
 	case addr >= 0x4000 && addr <= 0x7FFF:
-		// When 0x00 is read, the MBC translates that to bank 0x01 also the same happens for Bank 0x20, 0x40, and 0x60.
-		// Any attempt to address these ROM Banks will select Bank 0x21, 0x41, and 0x61 instead.
-		if mbc.CurrentROMBank == 0x00 || mbc.CurrentROMBank == 0x20 || mbc.CurrentROMBank == 0x40 || mbc.CurrentROMBank == 0x60 {
-			mbc.CurrentROMBank++
-		}
 		addr := addr - 0x4000
 		return mbc.CartridgeData[int(addr)+(int(mbc.CurrentROMBank)*0x4000)]
 	case addr >= 0xA000 && addr <= 0xBFFF:
@@ -75,19 +69,23 @@ func (mbc *MBC1) WriteByte(addr uint16, value byte) {
 		}
 	case addr >= 0x6000 && addr <= 0x7FFF:
 		switch value & 0x1 {
-		case 0:
+		case ROMBankingMode:
 			mbc.BankingMode = ROMBankingMode
-		case 1:
-			mbc.BankingMode = RAMBankingMode
 			// only RAM Bank 0 can be used during RAM Banking Mode
-			// and only ROM Banks 00-1Fh can be used during ROM Banking Mode
-			// so we set the RAM bank to 0 in this case
 			mbc.CurrentRAMBank = 0
+		case RAMBankingMode:
+			mbc.BankingMode = RAMBankingMode
+			// only ROM Banks 00-1Fh can be used during ROM Banking Mode
+			mbc.CurrentROMBank = mbc.CurrentROMBank & 0x1F
 		}
 	case addr >= 0xA000 && addr <= 0xBFFF:
 		if mbc.RAMEnabled {
 			addr := addr - 0xA000
 			mbc.RAM[addr+(uint16(mbc.CurrentRAMBank)*0x2000)] = value
 		}
+	}
+
+	if mbc.CurrentRAMBank&0x1F == 0 {
+		mbc.CurrentRAMBank++
 	}
 }

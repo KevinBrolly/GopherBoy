@@ -168,7 +168,6 @@ func (gameboy *Gameboy) Run() {
 						gameboy.Controller.KeyReleased(control.SELECT)
 					case sdl.K_RETURN:
 						gameboy.Controller.KeyReleased(control.START)
-
 					}
 				}
 			}

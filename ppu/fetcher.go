@@ -88,7 +88,7 @@ func (f *Fetcher) fetchSpriteLine(sprite *Sprite) []Dot {
 
 	line := make([]Dot, 8)
 	dataBit := 7
-	for i := byte(0); i <= 7; i++ {
+	for i := 0; i <= 7; i++ {
 		var colorIdentifier byte
 		if utils.IsBitSet(data1, byte(dataBit)) {
 			colorIdentifier = utils.SetBit(colorIdentifier, 0)
@@ -102,6 +102,15 @@ func (f *Fetcher) fetchSpriteLine(sprite *Sprite) []Dot {
 		}
 
 		dataBit--
+	}
+
+	// reverse the sprite if XFlip is set
+	if sprite.XFlip() {
+		// https://github.com/golang/go/wiki/SliceTricks#reversing
+		for i := len(line)/2-1; i >= 0; i-- {
+			opp := len(line)-1-i
+			line[i], line[opp] = line[opp], line[i]
+		}
 	}
 
 	return line

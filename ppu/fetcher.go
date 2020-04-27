@@ -107,8 +107,8 @@ func (f *Fetcher) fetchSpriteLine(sprite *Sprite) []Dot {
 	// reverse the sprite if XFlip is set
 	if sprite.XFlip() {
 		// https://github.com/golang/go/wiki/SliceTricks#reversing
-		for i := len(line)/2-1; i >= 0; i-- {
-			opp := len(line)-1-i
+		for i := len(line)/2 - 1; i >= 0; i-- {
+			opp := len(line) - 1 - i
 			line[i], line[opp] = line[opp], line[i]
 		}
 	}

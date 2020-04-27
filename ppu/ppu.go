@@ -539,14 +539,14 @@ func (ppu *PPU) renderScanline() {
 
 		x := 0
 		pushedDots := 0
-		for pushedDots <= 160 {
+		for pushedDots <= 159 {
 			if fifo.Length() <= 8 {
 				fifo.PushDots(fetcher.NextTileLine())
 			}
 
 			xSprites := make([]*Sprite, 0)
 			for _, sprite := range ppu.VisibleSprites {
-				if sprite != nil && int(sprite.X-8) == x {
+				if sprite != nil && (int(sprite.X-8)+int(ppu.SCX)) == x {
 					xSprites = append(xSprites, sprite)
 				}
 			}
@@ -577,9 +577,17 @@ func (ppu *PPU) renderScanline() {
 				}
 			}
 
-			if ppu.SCX <= byte(x) {
+			if int(ppu.SCX) <= x {
 				ppu.FrameBuffer.SetRGBA(pushedDots, int(ppu.LY), dot.ToRGBA(palette))
 				pushedDots++
+
+				// Background wraps around the screen (i.e. when part of it goes off the screen, it appears on the opposite side.)
+				// So if pushed dots and background x start position == 256 then we reset the fetcher tileMapAddress
+				// as the background wraps round
+				if int(ppu.SCX)+pushedDots == 256 {
+					fetcher.tileMapAddress = ppu.backgroundMapLocation
+					fifo.Clear()
+				}
 			}
 
 			x++

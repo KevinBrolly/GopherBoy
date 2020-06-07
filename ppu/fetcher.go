@@ -98,6 +98,7 @@ func (f *Fetcher) fetchSpriteLine(sprite *Sprite) []Dot {
 		}
 
 		line[i] = Dot{
+			Type: SPRITE,
 			ColorIdentifier: colorIdentifier,
 		}
 

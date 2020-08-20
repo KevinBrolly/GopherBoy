@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"sort"
 
 	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/utils"
@@ -512,6 +513,8 @@ func (ppu *PPU) OAMSearch() {
 	visibleSprites := make([]*Sprite, 0)
 
 	for _, sprite := range ppu.OAM {
+		// Only 10 sprites can be displayed on any one line. When this limit is exceeded,
+		// the lower priority sprites (priorities listed above) won't be displayed
 		if len(visibleSprites) == 10 {
 			break
 		}
@@ -521,6 +524,19 @@ func (ppu *PPU) OAMSearch() {
 		}
 	}
 
+	// When sprites with different x coordinate values overlap,
+	// the one with the smaller x coordinate (closer to the left)
+	// will have priority and appear above any others.
+	// This applies in Non CGB Mode only.
+	sort.Slice(visibleSprites, func(i, j int) bool {
+		return visibleSprites[i].X < visibleSprites[j].X
+	})
+
+	// When sprites with the same x coordinate values overlap,
+	// they have priority according to table ordering. (i.e. $FE00 - highest, $FE04 - next highest, etc.)
+	// In CGB Mode priorities are always assigned like this.
+	// TODO sprite ordering for CGB
+
 	ppu.VisibleSprites = visibleSprites
 }
 
@@ -528,6 +544,7 @@ func (ppu *PPU) renderScanline() {
 	if ppu.backgroundEnabled {
 
 		fifo := &Fifo{}
+		spriteFifo := &Fifo{}
 
 		fetcher := &Fetcher{
 			tileMapAddress:  ppu.backgroundMapLocation,
@@ -537,28 +554,24 @@ func (ppu *PPU) renderScanline() {
 			memory:          ppu.mmu,
 		}
 
-		x := 0
+		x := -8
+		fifo.PushDots(fetcher.FirstTileLine())
 		pushedDots := 0
 		for pushedDots <= 159 {
 			if fifo.Length() <= 8 {
 				fifo.PushDots(fetcher.NextTileLine())
 			}
 
-			xSprites := make([]*Sprite, 0)
 			for _, sprite := range ppu.VisibleSprites {
-				if sprite != nil && (int(sprite.X-8)+int(ppu.SCX)) == x {
-					xSprites = append(xSprites, sprite)
+				if sprite != nil && int(sprite.X)+int(ppu.SCX) == x+8 {
+					spriteFifo.PushDots(fetcher.fetchSpriteLine(sprite))
 				}
-			}
-			if len(xSprites) != 0 {
-				sprite := xSprites[len(xSprites)-1]
-				dots := fetcher.fetchSpriteLine(sprite)
-				fifo.OverlaySprite(dots, sprite.Palette(), sprite.Priority(), sprite.X)
 			}
 
 			if ppu.windowEnabled {
 				if ppu.WY <= ppu.LY {
 					if ppu.WX == byte(x) {
+						// TODO: Should we spriteFifo.Clear() here?
 						fifo.Clear()
 						fetcher.tileMapAddress = ppu.windowMapLocation
 						fifo.PushDots(fetcher.NextTileLine())
@@ -567,13 +580,22 @@ func (ppu *PPU) renderScanline() {
 			}
 
 			dot := fifo.PopDot()
-
 			palette := ppu.BGP
-			if dot.Type == SPRITE {
-				if dot.Palette == 0 {
-					palette = ppu.OBP0
-				} else {
-					palette = ppu.OBP1
+
+			if spriteFifo.Length() > 0 {
+				spriteDot := spriteFifo.PopDot()
+
+				// If there is a sprite at this position in the scanline
+				// and the sprite priority is 0 or the background dots
+				// colorIdentifier is 0, then the sprite is rendered on top
+				// of the background, otherwise the background is rendered.
+				if spriteDot.ColorIdentifier != 0 && (spriteDot.Priority == 0 || dot.ColorIdentifier == 0) {
+					dot = spriteDot
+					if dot.Palette == 0 {
+						palette = ppu.OBP0
+					} else {
+						palette = ppu.OBP1
+					}
 				}
 			}
 

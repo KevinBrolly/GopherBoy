@@ -13,6 +13,11 @@ type Fetcher struct {
 	memory          mmu.Memory
 }
 
+func (f *Fetcher) FirstTileLine() []*Dot {
+	tileLine := f.fetchTileLine(f.getTileIdentifier())
+	return tileLine
+}
+
 func (f *Fetcher) NextTileLine() []*Dot {
 	tileLine := f.fetchTileLine(f.getTileIdentifier())
 	f.tileMapAddress++
@@ -80,13 +85,13 @@ func (f *Fetcher) fetchTileLine(tileIdentifier byte) []*Dot {
 	return line
 }
 
-func (f *Fetcher) fetchSpriteLine(sprite *Sprite) []Dot {
+func (f *Fetcher) fetchSpriteLine(sprite *Sprite) []*Dot {
 	verticalLine := f.LY - (sprite.Y - 16)
 	verticalLine = verticalLine * 2 // each vertical line takes up two bytes of memory
 	spriteDataAddress := 0x8000 + uint16(sprite.TileNumber)*16
 	data1, data2 := f.getTileData(spriteDataAddress, verticalLine)
 
-	line := make([]Dot, 8)
+	line := make([]*Dot, 8)
 	dataBit := 7
 	for i := 0; i <= 7; i++ {
 		var colorIdentifier byte
@@ -97,9 +102,11 @@ func (f *Fetcher) fetchSpriteLine(sprite *Sprite) []Dot {
 			colorIdentifier = utils.SetBit(colorIdentifier, 1)
 		}
 
-		line[i] = Dot{
-			Type: SPRITE,
+		line[i] = &Dot{
 			ColorIdentifier: colorIdentifier,
+			Palette:         sprite.Palette(),
+			Priority:        sprite.Priority(),
+			Type:            SPRITE,
 		}
 
 		dataBit--

@@ -64,7 +64,6 @@ func (w *SDL2Window) DrawFrame(buffer *image.RGBA) {
 		panic(err)
 	}
 
-    draw.Draw(surface, surface.Bounds(), buffer, image.Point{}, draw.Src)
-
+	draw.Draw(surface, surface.Bounds(), buffer, image.Point{}, draw.Src)
 	w.window.UpdateSurface()
 }

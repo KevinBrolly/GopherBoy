@@ -12,7 +12,10 @@ type Sprite struct {
 }
 
 func (s *Sprite) Priority() byte {
-	return s.Attributes & 0x07
+	if utils.IsBitSet(s.Attributes, 7) {
+		return 1
+	}
+	return 0
 }
 
 func (s *Sprite) YFlip() bool {

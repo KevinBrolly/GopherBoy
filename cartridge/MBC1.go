@@ -1,4 +1,4 @@
-package mmu
+package cartridge
 
 const (
 	ROMBankingMode = 0

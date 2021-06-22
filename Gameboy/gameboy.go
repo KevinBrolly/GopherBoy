@@ -28,7 +28,6 @@ type Window interface {
 type Gameboy struct {
 	Window     Window
 	MMU        *mmu.MMU
-	MBC        mmu.Memory
 	CPU        *cpu.CPU
 	PPU        *ppu.PPU
 	APU        *apu.APU
@@ -71,7 +70,7 @@ func NewGameboy(window Window) (gameboy *Gameboy) {
 	return gameboy
 }
 
-func (gameboy *Gameboy) LoadCartridgeData(filename string) {
+func (gameboy *Gameboy) LoadCartridge(cart Cartridge) {
 	data, err := ioutil.ReadFile(filename)
 
 	if err != nil {

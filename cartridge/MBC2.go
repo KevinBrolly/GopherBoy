@@ -1,4 +1,4 @@
-package mmu
+package cartridge
 
 type MBC2 struct {
 	mmu            *MMU

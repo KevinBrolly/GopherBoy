@@ -1,4 +1,4 @@
-package mmu
+package cartridge
 
 import (
 	"testing"

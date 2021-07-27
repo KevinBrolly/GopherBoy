@@ -1,9 +1,10 @@
 package cartridge
 
 import (
-	"GopherBoy/mmu"
 	"io/ioutil"
 	"log"
+
+	"github.com/kevinbrolly/GopherBoy/mmu"
 )
 
 type Cartridge struct {
@@ -11,7 +12,7 @@ type Cartridge struct {
 	MBC  mmu.Memory
 }
 
-func NewCartridge(filename string) (cartridge *Cartridge) {
+func NewCartridge(filename string, mmu *mmu.MMU) (cartridge *Cartridge) {
 	data, err := ioutil.ReadFile(filename)
 
 	if err != nil {
@@ -22,17 +23,17 @@ func NewCartridge(filename string) (cartridge *Cartridge) {
 		data: data,
 	}
 
-	switch cartridge.Type {
+	switch cartridge.Type() {
 	case 0:
-		cartridge.MBC = NewMBC0(cartridge.MMU, data)
+		cartridge.MBC = NewMBC0(mmu, data)
 	case 1:
-		cartridge.MBC = NewMBC1(cartridge.MMU, data)
+		cartridge.MBC = NewMBC1(mmu, data)
 	case 2:
-		cartridge.MBC = NewMBC1(cartridge.MMU, data)
+		cartridge.MBC = NewMBC1(mmu, data)
 	case 3:
-		cartridge.MBC = NewMBC1(cartridge.MMU, data)
+		cartridge.MBC = NewMBC1(mmu, data)
 	case 4:
-		cartridge.MBC = NewMBC1(cartridge.MMU, data)
+		cartridge.MBC = NewMBC1(mmu, data)
 	}
 
 	return cartridge

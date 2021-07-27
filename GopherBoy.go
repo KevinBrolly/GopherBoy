@@ -1,11 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/draw"
 	"os"
-	"fmt"
-	"runtime"
 
 	"github.com/kevinbrolly/GopherBoy/gameboy"
 
@@ -19,7 +18,7 @@ func main() {
 	gameboy := gameboy.NewGameboy(window)
 
 	rom := os.Args[1]
-	gameboy.LoadCartridgeData(rom)
+	gameboy.LoadCartridge(rom)
 
 	gameboy.Run()
 }

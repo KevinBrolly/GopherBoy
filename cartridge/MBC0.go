@@ -1,11 +1,15 @@
 package cartridge
 
+import (
+	"github.com/kevinbrolly/GopherBoy/mmu"
+)
+
 type MBC0 struct {
-	mmu           *MMU
+	mmu           *mmu.MMU
 	CartridgeData []byte
 }
 
-func NewMBC0(mmu *MMU, data []byte) *MBC0 {
+func NewMBC0(mmu *mmu.MMU, data []byte) *MBC0 {
 	mbc0 := &MBC0{
 		mmu:           mmu,
 		CartridgeData: data,

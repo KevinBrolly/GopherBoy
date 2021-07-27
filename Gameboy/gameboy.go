@@ -3,11 +3,10 @@ package gameboy
 import (
 	"fmt"
 	"image"
-	"io/ioutil"
-	"log"
 	"time"
 
 	"github.com/kevinbrolly/GopherBoy/apu"
+	"github.com/kevinbrolly/GopherBoy/cartridge"
 	"github.com/kevinbrolly/GopherBoy/control"
 	"github.com/kevinbrolly/GopherBoy/cpu"
 	"github.com/kevinbrolly/GopherBoy/mmu"
@@ -32,6 +31,7 @@ type Gameboy struct {
 	PPU        *ppu.PPU
 	APU        *apu.APU
 	Controller *control.Controller
+	Cartridge  *cartridge.Cartridge
 
 	inBootMode        bool
 	dmgStatusRegister byte
@@ -70,24 +70,8 @@ func NewGameboy(window Window) (gameboy *Gameboy) {
 	return gameboy
 }
 
-func (gameboy *Gameboy) LoadCartridge(cart Cartridge) {
-	data, err := ioutil.ReadFile(filename)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	switch data[0x147] {
-	case 0:
-		gameboy.MBC = mmu.NewMBC0(gameboy.MMU, data)
-	case 1:
-		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
-	case 2:
-		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
-	case 3:
-		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
-	case 4:
-		gameboy.MBC = mmu.NewMBC1(gameboy.MMU, data)
-	}
+func (gameboy *Gameboy) LoadCartridge(filename string) {
+	gameboy.Cartridge = cartridge.NewCartridge(filename, gameboy.MMU)
 }
 
 func (gameboy *Gameboy) Run() {

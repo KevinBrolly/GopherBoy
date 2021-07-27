@@ -1,12 +1,16 @@
 package cartridge
 
+import (
+	"github.com/kevinbrolly/GopherBoy/mmu"
+)
+
 const (
 	ROMBankingMode = 0
 	RAMBankingMode = 1
 )
 
 type MBC1 struct {
-	mmu            *MMU
+	mmu            *mmu.MMU
 	CartridgeData  []byte
 	RAM            []byte
 	RAMEnabled     bool
@@ -15,7 +19,7 @@ type MBC1 struct {
 	BankingMode    int
 }
 
-func NewMBC1(mmu *MMU, data []byte) *MBC1 {
+func NewMBC1(mmu *mmu.MMU, data []byte) *MBC1 {
 	mbc1 := &MBC1{
 		mmu:           mmu,
 		CartridgeData: data,

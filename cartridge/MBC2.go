@@ -1,7 +1,11 @@
 package cartridge
 
+import (
+	"github.com/kevinbrolly/GopherBoy/mmu"
+)
+
 type MBC2 struct {
-	mmu            *MMU
+	mmu            *mmu.MMU
 	CartridgeData  []byte
 	ROM            []byte
 	RAM            []byte
@@ -9,7 +13,7 @@ type MBC2 struct {
 	CurrentROMBank int
 }
 
-func NewMBC2(mmu *MMU, data []byte) *MBC2 {
+func NewMBC2(mmu *mmu.MMU, data []byte) *MBC2 {
 	mbc2 := &MBC2{
 		mmu:            mmu,
 		CartridgeData:  data,

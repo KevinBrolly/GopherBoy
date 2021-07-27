@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/draw"
 	"os"
+	"fmt"
 	"runtime"
 
 	"github.com/kevinbrolly/GopherBoy/gameboy"
@@ -12,8 +13,7 @@ import (
 )
 
 func main() {
-	runtime.LockOSThread()
-
+	fmt.Print("Test")
 	window := NewSDL2Window("Gameboy", 160, 144)
 
 	gameboy := gameboy.NewGameboy(window)
@@ -33,6 +33,7 @@ type SDL2Window struct {
 }
 
 func NewSDL2Window(name string, width, height int) *SDL2Window {
+	fmt.Print("Ttest")
 	w := &SDL2Window{
 		Name:   name,
 		Width:  width,

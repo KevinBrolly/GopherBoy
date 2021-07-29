@@ -2309,7 +2309,7 @@ func (cpu *CPU) NOP() (cycles byte) {
 	return 1
 }
 
-// NOP | 1 | ---- | Halt until interrupt occurs
+// Halt | 1 | ---- | Halt until interrupt occurs
 func (cpu *CPU) HALT() (cycles byte) {
 	cpu.Halt = true
 	return 1

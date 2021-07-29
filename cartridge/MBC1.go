@@ -26,6 +26,8 @@ func NewMBC1(mmu *mmu.MMU, data []byte) *MBC1 {
 		RAM:           make([]byte, 0x8000),
 		RAMEnabled:    false,
 		BankingMode:   ROMBankingMode,
+		// The ROM Bank Number defaults to 01
+		CurrentROMBank: 0x01,
 	}
 
 	// Cartridge ROM range

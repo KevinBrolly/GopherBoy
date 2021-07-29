@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/draw"
 	"os"
@@ -12,7 +11,6 @@ import (
 )
 
 func main() {
-	fmt.Print("Test")
 	window := NewSDL2Window("Gameboy", 160, 144)
 
 	gameboy := gameboy.NewGameboy(window)
@@ -32,7 +30,6 @@ type SDL2Window struct {
 }
 
 func NewSDL2Window(name string, width, height int) *SDL2Window {
-	fmt.Print("Ttest")
 	w := &SDL2Window{
 		Name:   name,
 		Width:  width,

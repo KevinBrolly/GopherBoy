@@ -11,6 +11,7 @@ import (
 	"github.com/kevinbrolly/GopherBoy/cpu"
 	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/ppu"
+	"github.com/kevinbrolly/GopherBoy/utils"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -75,6 +76,7 @@ func (gameboy *Gameboy) LoadCartridge(filename string) {
 }
 
 func (gameboy *Gameboy) Run() {
+
 	frameTime := time.Second / 60
 
 	ticker := time.NewTicker(frameTime)
@@ -90,21 +92,23 @@ func (gameboy *Gameboy) Run() {
 			gameboy.APU.Tick(cycles)
 			cyclesThisUpdate += cycles
 
-			// fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %#x, IF: %#x, LCDC: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n",
-			// 	gameboy.CPU.GetOpcode(),
-			// 	gameboy.CPU.CurrentInstruction.Description,
-			// 	gameboy.PPU.LY,
-			// 	gameboy.CPU.PC,
-			// 	gameboy.CPU.SP,
-			// 	gameboy.CPU.IME,
-			// 	gameboy.CPU.IE,
-			// 	gameboy.CPU.IF,
-			// 	gameboy.PPU.LCDC,
-			// 	utils.JoinBytes(gameboy.CPU.Registers.A, gameboy.CPU.Registers.F),
-			// 	utils.JoinBytes(gameboy.CPU.Registers.B, gameboy.CPU.Registers.C),
-			// 	utils.JoinBytes(gameboy.CPU.Registers.D, gameboy.CPU.Registers.E),
-			// 	utils.JoinBytes(gameboy.CPU.Registers.H, gameboy.CPU.Registers.L),
-			// )
+			if gameboy.Controller.Debug {
+				fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %#x, IF: %#x, LCDC: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n",
+					gameboy.CPU.GetOpcode(),
+					gameboy.CPU.CurrentInstruction.Description,
+					gameboy.PPU.LY,
+					gameboy.CPU.PC,
+					gameboy.CPU.SP,
+					gameboy.CPU.IME,
+					gameboy.CPU.IE,
+					gameboy.CPU.IF,
+					gameboy.PPU.LCDC,
+					utils.JoinBytes(gameboy.CPU.Registers.A, gameboy.CPU.Registers.F),
+					utils.JoinBytes(gameboy.CPU.Registers.B, gameboy.CPU.Registers.C),
+					utils.JoinBytes(gameboy.CPU.Registers.D, gameboy.CPU.Registers.E),
+					utils.JoinBytes(gameboy.CPU.Registers.H, gameboy.CPU.Registers.L),
+				)
+			}
 		}
 
 		// Check for events
@@ -132,6 +136,8 @@ func (gameboy *Gameboy) Run() {
 						gameboy.Controller.KeyPressed(control.SELECT)
 					case sdl.K_RETURN:
 						gameboy.Controller.KeyPressed(control.START)
+					case sdl.K_z:
+						gameboy.Controller.KeyPressed(control.DEBUG)
 					}
 				} else if e.Type == sdl.KEYUP {
 					switch e.Keysym.Sym {
@@ -151,6 +157,8 @@ func (gameboy *Gameboy) Run() {
 						gameboy.Controller.KeyReleased(control.SELECT)
 					case sdl.K_RETURN:
 						gameboy.Controller.KeyReleased(control.START)
+					case sdl.K_z:
+						gameboy.Controller.KeyPressed(control.DEBUG)
 					}
 				}
 			}

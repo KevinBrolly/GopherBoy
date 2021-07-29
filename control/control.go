@@ -21,12 +21,15 @@ const (
 	B      = 5
 	SELECT = 6
 	START  = 7
+
+	DEBUG = 9
 )
 
 type Controller struct {
 	mmu             *mmu.MMU
 	controllerState byte
 	P1              byte
+	Debug           bool
 }
 
 func NewController(mmu *mmu.MMU) *Controller {
@@ -56,6 +59,8 @@ func (c *Controller) KeyPressed(key byte) {
 		if !utils.IsBitSet(c.P1, SELECT_BUTTON_KEYS) {
 			c.mmu.RequestInterrupt(JOYPAD_INTERRUPT)
 		}
+	case DEBUG:
+		c.Debug = !c.Debug
 	}
 }
 

@@ -49,7 +49,8 @@ type CPU struct {
 	IE  byte // Interrupt Enabled
 	IME bool // Interrupt Master Enable
 
-	Halt bool
+	Halt         bool
+	cycleChannel chan int
 }
 
 func NewCPU(mmu *mmu.MMU) *CPU {
@@ -144,7 +145,7 @@ func (cpu *CPU) Step() (cycles int) {
 	cpu.timer.Tick(cycles)
 	cpu.handleInterrupts()
 
-	return cycles * 4
+	cycleChannel <- cycles * 4
 }
 
 func (cpu *CPU) handleInterrupts() {

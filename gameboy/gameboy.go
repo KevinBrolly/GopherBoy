@@ -39,8 +39,9 @@ type Gameboy struct {
 	WorkingRAM        [8192]byte //0xC000 -> 0xDFFF (8KB Working RAM)
 	HRAM              [128]byte  //0xFF80 -> 0xFFFE High RAM (HRAM)
 
-	debug   byte
-	running bool
+	cycleChannel chan int
+	debug        byte
+	running      bool
 }
 
 func NewGameboy(window Window) (gameboy *Gameboy) {

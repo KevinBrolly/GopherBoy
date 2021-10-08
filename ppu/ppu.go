@@ -161,7 +161,8 @@ type PPU struct {
 	// LCDC Bit 0 - BG Display (for CGB see below) (0=Off, 1=On)
 	backgroundEnabled bool
 
-	Cycles int // Number of cycles since the last LCD Status Mode Change
+	Cycles       int // Number of cycles since the last LCD Status Mode Change
+	cycleChannel chan int
 }
 
 type pixelAttributes struct {
@@ -402,110 +403,112 @@ func (ppu *PPU) setLCDCFields(value byte) {
 	ppu.backgroundEnabled = utils.IsBitSet(value, 0)
 }
 
-func (ppu *PPU) Step(cycles int) {
-	if ppu.lcdEnabled {
-		ppu.Cycles += cycles
+func (ppu *PPU) Step() {
+	for cycle := range ppu.cycleChannel {
+		if ppu.lcdEnabled {
+			ppu.Cycles += cycle
 
-		// STAT indicates the current status of the LCD controller.
-		switch ppu.STAT.mode {
-		// HBlank
-		// After the last HBlank, push the screen data to canvas
-		case MODE0:
-			if ppu.Cycles >= 204 {
-				// Reset the cycle counter
-				ppu.Cycles = 0
+			// STAT indicates the current status of the LCD controller.
+			switch ppu.STAT.mode {
+			// HBlank
+			// After the last HBlank, push the screen data to canvas
+			case MODE0:
+				if ppu.Cycles >= 204 {
+					// Reset the cycle counter
+					ppu.Cycles = 0
 
-				// Increase the scanline
-				ppu.LY++
+					// Increase the scanline
+					ppu.LY++
 
-				// 143 is the last line, update the screen and enter VBlank
-				if ppu.LY == 144 {
-					// Request VBLANK interrupt
-					ppu.mmu.RequestInterrupt(VBLANK_INTERRUPT)
+					// 143 is the last line, update the screen and enter VBlank
+					if ppu.LY == 144 {
+						// Request VBLANK interrupt
+						ppu.mmu.RequestInterrupt(VBLANK_INTERRUPT)
 
-					// Enter GPU Mode 1/VBlank
-					ppu.STAT.mode = MODE1
-					if ppu.STAT.vblankInterruptEnabled {
+						// Enter GPU Mode 1/VBlank
+						ppu.STAT.mode = MODE1
+						if ppu.STAT.vblankInterruptEnabled {
+							ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
+						}
+					} else {
+						// Enter GPU Mode 2/OAM Access
+						ppu.STAT.mode = MODE2
+						if ppu.STAT.oamInterruptEnabled {
+							ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
+						}
+					}
+				}
+
+			// VBlank
+			// After 10 lines, restart scanline and draw the next frame
+			case MODE1:
+				if ppu.Cycles >= 456 {
+					// Reset the cycle counter
+					ppu.Cycles = 0
+
+					// Increase the scanline
+					ppu.LY++
+
+					// If Scanline is 153 we have done 10 lines of VBlank
+					if ppu.LY > 153 {
+						// Start of next Frame
+						// Enter GPU Mode 2/OAM Access
+						ppu.STAT.mode = MODE2
+						if ppu.STAT.oamInterruptEnabled {
+							ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
+						}
+
+						// Reset the Scanline
+						ppu.LY = 0
+					}
+				}
+
+			// OAM access mode, scanline active
+			case MODE2:
+				if ppu.Cycles >= 80 {
+					// Do OAMSearch
+					ppu.OAMSearch()
+					// Reset the cycle counter
+					ppu.Cycles = 0
+					// Enter GPU Mode 3
+					ppu.STAT.mode = MODE3
+				}
+
+			// VRAM access mode, scanline active
+			// Treat end of mode 3 as end of scanline
+			case MODE3:
+				if ppu.Cycles >= 172 {
+					// Reset the cycle counter
+					ppu.Cycles = 0
+
+					// Enter GPU Mode 0/HBlank
+					ppu.STAT.mode = MODE0
+					if ppu.STAT.hblankInterruptEnabled {
 						ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
 					}
-				} else {
-					// Enter GPU Mode 2/OAM Access
-					ppu.STAT.mode = MODE2
-					if ppu.STAT.oamInterruptEnabled {
-						ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
-					}
+
+					// Write a scanline to the framebuffer
+					ppu.renderScanline()
 				}
 			}
 
-		// VBlank
-		// After 10 lines, restart scanline and draw the next frame
-		case MODE1:
-			if ppu.Cycles >= 456 {
-				// Reset the cycle counter
-				ppu.Cycles = 0
+			// If LY == LYC then set the STAT match flag and perform
+			// the match flag interrupt if it has been requested
+			if ppu.LY == ppu.LYC {
+				ppu.STAT.coincidenceFlag = true
 
-				// Increase the scanline
-				ppu.LY++
-
-				// If Scanline is 153 we have done 10 lines of VBlank
-				if ppu.LY > 153 {
-					// Start of next Frame
-					// Enter GPU Mode 2/OAM Access
-					ppu.STAT.mode = MODE2
-					if ppu.STAT.oamInterruptEnabled {
-						ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
-					}
-
-					// Reset the Scanline
-					ppu.LY = 0
-				}
-			}
-
-		// OAM access mode, scanline active
-		case MODE2:
-			if ppu.Cycles >= 80 {
-				// Do OAMSearch
-				ppu.OAMSearch()
-				// Reset the cycle counter
-				ppu.Cycles = 0
-				// Enter GPU Mode 3
-				ppu.STAT.mode = MODE3
-			}
-
-		// VRAM access mode, scanline active
-		// Treat end of mode 3 as end of scanline
-		case MODE3:
-			if ppu.Cycles >= 172 {
-				// Reset the cycle counter
-				ppu.Cycles = 0
-
-				// Enter GPU Mode 0/HBlank
-				ppu.STAT.mode = MODE0
-				if ppu.STAT.hblankInterruptEnabled {
+				if ppu.STAT.coincidenceInterruptEnabled {
 					ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
 				}
-
-				// Write a scanline to the framebuffer
-				ppu.renderScanline()
+			} else {
+				ppu.STAT.coincidenceFlag = false
 			}
-		}
 
-		// If LY == LYC then set the STAT match flag and perform
-		// the match flag interrupt if it has been requested
-		if ppu.LY == ppu.LYC {
-			ppu.STAT.coincidenceFlag = true
-
-			if ppu.STAT.coincidenceInterruptEnabled {
-				ppu.mmu.RequestInterrupt(LCDC_INTERRUPT)
-			}
 		} else {
-			ppu.STAT.coincidenceFlag = false
+			ppu.Cycles = 456
+			ppu.LY = 0
+			ppu.STAT.mode = MODE0
 		}
-
-	} else {
-		ppu.Cycles = 456
-		ppu.LY = 0
-		ppu.STAT.mode = MODE0
 	}
 }
 

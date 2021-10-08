@@ -122,6 +122,8 @@ type APU struct {
 
 	// NR52
 	enable bool
+
+	cycleChannel chan int
 }
 
 func NewAPU(mmu *mmu.MMU) *APU {
@@ -160,77 +162,79 @@ func NewAPU(mmu *mmu.MMU) *APU {
 }
 
 func (s *APU) Tick(cycles int) {
-	s.channel1.Tick(cycles)
-	s.channel2.Tick(cycles)
-	s.channel3.Tick(cycles)
-	s.channel4.Tick(cycles)
+	for cycle := cycleChannel range  {
+		s.channel1.Tick(cycle)
+		s.channel2.Tick(cycle)
+		s.channel3.Tick(cycle)
+		s.channel4.Tick(cycle)
 
-	if s.frameSequencerTimer > 0 {
-		s.frameSequencerTimer = s.frameSequencerTimer - cycles
-	}
+		if s.frameSequencerTimer > 0 {
+			s.frameSequencerTimer = s.frameSequencerTimer - cycle
+		}
 
-	if s.frameSequencerTimer <= 0 {
-		s.tickFrameSequencer()
-	}
+		if s.frameSequencerTimer <= 0 {
+			s.tickFrameSequencer()
+		}
 
-	if s.sampleTimer > 0 {
-		s.sampleTimer = s.sampleTimer - cycles
-	}
+		if s.sampleTimer > 0 {
+			s.sampleTimer = s.sampleTimer - cycle
+		}
 
-	if s.sampleTimer <= 0 {
-		SO2 := int(0)
-		SO1 := int(0)
+		if s.sampleTimer <= 0 {
+			SO2 := int(0)
+			SO1 := int(0)
 
-		if s.enable {
-			channel1Sample := int(s.channel1.sample())
-			channel2Sample := int(s.channel2.sample())
-			channel3Sample := int(s.channel3.sample())
-			channel4Sample := int(s.channel4.sample())
+			if s.enable {
+				channel1Sample := int(s.channel1.sample())
+				channel2Sample := int(s.channel2.sample())
+				channel3Sample := int(s.channel3.sample())
+				channel4Sample := int(s.channel4.sample())
 
-			if s.output4SO2 {
-				SO2 += channel4Sample
+				if s.output4SO2 {
+					SO2 += channel4Sample
+				}
+				if s.output3SO2 {
+					SO2 += channel3Sample
+				}
+				if s.output2SO2 {
+					SO2 += channel2Sample
+				}
+				if s.output1SO2 {
+					SO2 += channel1Sample
+				}
+
+				if s.output4SO1 {
+					SO1 += channel4Sample
+				}
+				if s.output3SO1 {
+					SO1 += channel3Sample
+				}
+				if s.output2SO1 {
+					SO1 += channel2Sample
+				}
+				if s.output1SO1 {
+					SO1 += channel1Sample
+				}
+
+				SO2 = ((0xf - SO2*2) * int(s.volumeSO2+1))
+				SO1 = ((0xf - SO1*2) * int(s.volumeSO1+1))
+
+				var L = int16(SO1)
+				var R = int16(SO2)
+
+				binary.Write(s.sampleBuffer, binary.LittleEndian, L)
+				binary.Write(s.sampleBuffer, binary.LittleEndian, R)
+				s.sampleCount++
+
+				if s.sampleCount == Samples {
+					s.sampleCount = 0
+					sdl.QueueAudio(1, s.sampleBuffer.Bytes())
+					s.sampleBuffer.Reset()
+				}
+
+				// Reload sample timer
+				s.sampleTimer = 4194304 / Frequency
 			}
-			if s.output3SO2 {
-				SO2 += channel3Sample
-			}
-			if s.output2SO2 {
-				SO2 += channel2Sample
-			}
-			if s.output1SO2 {
-				SO2 += channel1Sample
-			}
-
-			if s.output4SO1 {
-				SO1 += channel4Sample
-			}
-			if s.output3SO1 {
-				SO1 += channel3Sample
-			}
-			if s.output2SO1 {
-				SO1 += channel2Sample
-			}
-			if s.output1SO1 {
-				SO1 += channel1Sample
-			}
-
-			SO2 = ((0xf - SO2*2) * int(s.volumeSO2+1))
-			SO1 = ((0xf - SO1*2) * int(s.volumeSO1+1))
-
-			var L = int16(SO1)
-			var R = int16(SO2)
-
-			binary.Write(s.sampleBuffer, binary.LittleEndian, L)
-			binary.Write(s.sampleBuffer, binary.LittleEndian, R)
-			s.sampleCount++
-
-			if s.sampleCount == Samples {
-				s.sampleCount = 0
-				sdl.QueueAudio(1, s.sampleBuffer.Bytes())
-				s.sampleBuffer.Reset()
-			}
-
-			// Reload sample timer
-			s.sampleTimer = 4194304 / Frequency
 		}
 	}
 }

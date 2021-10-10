@@ -41,22 +41,27 @@ type Gameboy struct {
 
 	debug   byte
 	running bool
+
+	cycleChannel chan int
 }
 
 func NewGameboy(window Window) (gameboy *Gameboy) {
+	cycleChannel := make(chan int)
+
 	mmu := mmu.NewMMU()
-	cpu := cpu.NewCPU(mmu)
-	ppu := ppu.NewPPU(mmu)
-	apu := apu.NewAPU(mmu)
+	cpu := cpu.NewCPU(mmu, cycleChannel)
+	ppu := ppu.NewPPU(mmu, cycleChannel)
+	apu := apu.NewAPU(mmu, cycleChannel)
 	controller := control.NewController(mmu)
 
 	gameboy = &Gameboy{
-		Window:     window,
-		MMU:        mmu,
-		CPU:        cpu,
-		PPU:        ppu,
-		APU:        apu,
-		Controller: controller,
+		Window:       window,
+		MMU:          mmu,
+		CPU:          cpu,
+		PPU:          ppu,
+		APU:          apu,
+		Controller:   controller,
+		cycleChannel: cycleChannel,
 	}
 
 	// Map memory for outputting result of blargg tests
@@ -88,8 +93,7 @@ func (gameboy *Gameboy) Run() {
 
 		for cyclesThisUpdate < MAXCYCLES {
 			cycles := gameboy.CPU.Step()
-			gameboy.PPU.Step(cycles)
-			gameboy.APU.Tick(cycles)
+
 			cyclesThisUpdate += cycles
 
 			if gameboy.Controller.Debug {

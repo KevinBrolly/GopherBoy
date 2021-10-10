@@ -25,7 +25,6 @@ type Timer struct {
 
 	dividerCounter int
 	timerCounter   int
-	cycleChannel chan int
 }
 
 func NewTimer(mmu *mmu.MMU) *Timer {
@@ -51,47 +50,46 @@ func (timer *Timer) Reset() {
 }
 
 func (timer *Timer) Tick(cycles int) {
-	for cycle := range cycleChannel {
-		timer.updateDividerRegister(cycle)
+	timer.updateDividerRegister(cycles)
 
-		if utils.IsBitSet(timer.TAC, TIMER_STOP) {
+	if utils.IsBitSet(timer.TAC, TIMER_STOP) {
 
-			timer.timerCounter += cycles
+		timer.timerCounter += cycles
 
-			var threshold int
-			frequency := timer.getClockFrequency()
+		var threshold int
+		frequency := timer.getClockFrequency()
 
-			switch frequency {
-			case 0:
-				threshold = 256 // frequency 4096
-			case 1:
-				threshold = 4 // frequency 262144
-			case 2:
-				threshold = 16 // frequency 65536
-			case 3:
-				threshold = 64 // frequency 16382
-			}
+		switch frequency {
+		case 0:
+			threshold = 256 // frequency 4096
+		case 1:
+			threshold = 4 // frequency 262144
+		case 2:
+			threshold = 16 // frequency 65536
+		case 3:
+			threshold = 64 // frequency 16382
+		}
 
-			// https://github.com/fishberg/feo-boy/blob/master/src/bus/timer.rs#L56
-			// This is the source of a common timer bug and the reason blargg's instr_timing
-			// test was failing with "Failure #255".
-			//
-			// Some instructions will go over the threshold in one instruction so rather than
-			// reset the timerCounter to the current threshold we just subtract the threshold
-			// to "reset" it, this way any cycles left over will still be counted/available
-			// in timerCounter
-			for timer.timerCounter >= threshold {
-				timer.timerCounter -= threshold
+		// https://github.com/fishberg/feo-boy/blob/master/src/bus/timer.rs#L56
+		// This is the source of a common timer bug and the reason blargg's instr_timing
+		// test was failing with "Failure #255".
+		//
+		// Some instructions will go over the threshold in one instruction so rather than
+		// reset the timerCounter to the current threshold we just subtract the threshold
+		// to "reset" it, this way any cycles left over will still be counted/available
+		// in timerCounter
+		for timer.timerCounter >= threshold {
+			timer.timerCounter -= threshold
 
-				// If timer is about to overflow
-				if timer.TIMA == 255 {
-					timer.TIMA = timer.TMA
-					timer.mmu.RequestInterrupt(TIMER_OVERFLOW_INTERRUPT)
-				} else {
-					timer.TIMA = timer.TIMA + 1
-				}
+			// If timer is about to overflow
+			if timer.TIMA == 255 {
+				timer.TIMA = timer.TMA
+				timer.mmu.RequestInterrupt(TIMER_OVERFLOW_INTERRUPT)
+			} else {
+				timer.TIMA = timer.TIMA + 1
 			}
 		}
+	}
 }
 
 func (timer *Timer) updateDividerRegister(cycles int) {

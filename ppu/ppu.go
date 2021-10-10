@@ -171,7 +171,7 @@ type pixelAttributes struct {
 	priority        byte
 }
 
-func NewPPU(mmu *mmu.MMU) *PPU {
+func NewPPU(mmu *mmu.MMU, cycleChannel chan int) *PPU {
 
 	rectImage := image.NewRGBA(image.Rect(0, 0, 160, 144))
 	draw.Draw(rectImage, rectImage.Bounds(), &image.Uniform{color.Black}, image.ZP, draw.Src)
@@ -183,6 +183,7 @@ func NewPPU(mmu *mmu.MMU) *PPU {
 	}
 
 	ppu := &PPU{
+		cycleChannel:   cycleChannel,
 		mmu:            mmu,
 		OAM:            oam,
 		VisibleSprites: make([]*Sprite, 10),
@@ -226,6 +227,8 @@ func NewPPU(mmu *mmu.MMU) *PPU {
 
 	// OAM RAM
 	mmu.MapMemoryRange(ppu, 0xFE00, 0xFE9F)
+
+	go ppu.Step()
 
 	return ppu
 }

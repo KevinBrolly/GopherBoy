@@ -53,10 +53,11 @@ type CPU struct {
 	cycleChannel chan int
 }
 
-func NewCPU(mmu *mmu.MMU) *CPU {
+func NewCPU(mmu *mmu.MMU, cycleChannel chan int) *CPU {
 	cpu := &CPU{
-		mmu:   mmu,
-		timer: NewTimer(mmu),
+		mmu:          mmu,
+		cycleChannel: cycleChannel,
+		timer:        NewTimer(mmu),
 	}
 
 	// FF0F - IF - Interrupt Flag
@@ -145,7 +146,8 @@ func (cpu *CPU) Step() (cycles int) {
 	cpu.timer.Tick(cycles)
 	cpu.handleInterrupts()
 
-	cycleChannel <- cycles * 4
+	cpu.cycleChannel <- cycles * 4
+	return cycles
 }
 
 func (cpu *CPU) handleInterrupts() {

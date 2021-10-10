@@ -126,8 +126,9 @@ type APU struct {
 	cycleChannel chan int
 }
 
-func NewAPU(mmu *mmu.MMU) *APU {
+func NewAPU(mmu *mmu.MMU, cycleChannel chan int) *APU {
 	apu := &APU{
+		cycleChannel: cycleChannel,
 		mmu:          mmu,
 		channel1:     &Square1Channel{},
 		channel2:     &Square2Channel{},
@@ -158,11 +159,14 @@ func NewAPU(mmu *mmu.MMU) *APU {
 	}
 
 	sdl.PauseAudio(false)
+
+	go apu.Tick()
+
 	return apu
 }
 
-func (s *APU) Tick(cycles int) {
-	for cycle := cycleChannel range  {
+func (s *APU) Tick() {
+	for cycle := range s.cycleChannel {
 		s.channel1.Tick(cycle)
 		s.channel2.Tick(cycle)
 		s.channel3.Tick(cycle)

@@ -11,7 +11,6 @@ import (
 	"github.com/kevinbrolly/GopherBoy/cpu"
 	"github.com/kevinbrolly/GopherBoy/mmu"
 	"github.com/kevinbrolly/GopherBoy/ppu"
-	"github.com/kevinbrolly/GopherBoy/utils"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -48,7 +47,7 @@ type Gameboy struct {
 func NewGameboy(window Window) (gameboy *Gameboy) {
 	cycleChannel := make(chan int)
 
-	mmu := mmu.NewMMU()
+	mmu := mmu.NewMMU(cycleChannel)
 	cpu := cpu.NewCPU(mmu, cycleChannel)
 	ppu := ppu.NewPPU(mmu, cycleChannel)
 	apu := apu.NewAPU(mmu, cycleChannel)
@@ -87,93 +86,83 @@ func (gameboy *Gameboy) Run() {
 	ticker := time.NewTicker(frameTime)
 	start := time.Now()
 	frames := 0
-	for range ticker.C {
-		MAXCYCLES := 69905
-		cyclesThisUpdate := 0
 
-		for cyclesThisUpdate < MAXCYCLES {
-			cycles := gameboy.CPU.Step()
+	// 4.194304MHz == 4194304hz / 60 = ~69905 cycles in one second
+	cyclesThisUpdate := 0
+	MAXCYCLES := 69905
 
-			cyclesThisUpdate += cycles
-
-			if gameboy.Controller.Debug {
-				fmt.Printf("OPCODE: %#x, Desc: %v, LY: %#x, PC: %#x, SP: %#x, IME: %v, IE: %#x, IF: %#x, LCDC: %#x, AF: %#x, BC: %#x, DE: %#x, HL: %#x\n",
-					gameboy.CPU.GetOpcode(),
-					gameboy.CPU.CurrentInstruction.Description,
-					gameboy.PPU.LY,
-					gameboy.CPU.PC,
-					gameboy.CPU.SP,
-					gameboy.CPU.IME,
-					gameboy.CPU.IE,
-					gameboy.CPU.IF,
-					gameboy.PPU.LCDC,
-					utils.JoinBytes(gameboy.CPU.Registers.A, gameboy.CPU.Registers.F),
-					utils.JoinBytes(gameboy.CPU.Registers.B, gameboy.CPU.Registers.C),
-					utils.JoinBytes(gameboy.CPU.Registers.D, gameboy.CPU.Registers.E),
-					utils.JoinBytes(gameboy.CPU.Registers.H, gameboy.CPU.Registers.L),
-				)
+	for {
+		select {
+		case cycle := <-gameboy.cycleChannel:
+			fmt.Printf("%v/n", cyclesThisUpdate)
+			cyclesThisUpdate += cycle
+			if cyclesThisUpdate == MAXCYCLES {
+				gameboy.CPU.IsRunning = false
 			}
-		}
+		case <-ticker.C:
+			// Check for events
+			for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+				switch e := event.(type) {
+				case *sdl.QuitEvent:
+					gameboy.Quit()
 
-		// Check for events
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch e := event.(type) {
-			case *sdl.QuitEvent:
-				gameboy.Quit()
-
-			case *sdl.KeyboardEvent:
-				if e.Type == sdl.KEYDOWN {
-					switch e.Keysym.Sym {
-					case sdl.K_RIGHT:
-						gameboy.Controller.KeyPressed(control.RIGHT)
-					case sdl.K_LEFT:
-						gameboy.Controller.KeyPressed(control.LEFT)
-					case sdl.K_UP:
-						gameboy.Controller.KeyPressed(control.UP)
-					case sdl.K_DOWN:
-						gameboy.Controller.KeyPressed(control.DOWN)
-					case sdl.K_s:
-						gameboy.Controller.KeyPressed(control.A)
-					case sdl.K_a:
-						gameboy.Controller.KeyPressed(control.B)
-					case sdl.K_SPACE:
-						gameboy.Controller.KeyPressed(control.SELECT)
-					case sdl.K_RETURN:
-						gameboy.Controller.KeyPressed(control.START)
-					case sdl.K_z:
-						gameboy.Controller.KeyPressed(control.DEBUG)
-					}
-				} else if e.Type == sdl.KEYUP {
-					switch e.Keysym.Sym {
-					case sdl.K_RIGHT:
-						gameboy.Controller.KeyReleased(control.RIGHT)
-					case sdl.K_LEFT:
-						gameboy.Controller.KeyReleased(control.LEFT)
-					case sdl.K_UP:
-						gameboy.Controller.KeyReleased(control.UP)
-					case sdl.K_DOWN:
-						gameboy.Controller.KeyReleased(control.DOWN)
-					case sdl.K_s:
-						gameboy.Controller.KeyReleased(control.A)
-					case sdl.K_a:
-						gameboy.Controller.KeyReleased(control.B)
-					case sdl.K_SPACE:
-						gameboy.Controller.KeyReleased(control.SELECT)
-					case sdl.K_RETURN:
-						gameboy.Controller.KeyReleased(control.START)
-					case sdl.K_z:
-						gameboy.Controller.KeyPressed(control.DEBUG)
+				case *sdl.KeyboardEvent:
+					if e.Type == sdl.KEYDOWN {
+						switch e.Keysym.Sym {
+						case sdl.K_RIGHT:
+							gameboy.Controller.KeyPressed(control.RIGHT)
+						case sdl.K_LEFT:
+							gameboy.Controller.KeyPressed(control.LEFT)
+						case sdl.K_UP:
+							gameboy.Controller.KeyPressed(control.UP)
+						case sdl.K_DOWN:
+							gameboy.Controller.KeyPressed(control.DOWN)
+						case sdl.K_s:
+							gameboy.Controller.KeyPressed(control.A)
+						case sdl.K_a:
+							gameboy.Controller.KeyPressed(control.B)
+						case sdl.K_SPACE:
+							gameboy.Controller.KeyPressed(control.SELECT)
+						case sdl.K_RETURN:
+							gameboy.Controller.KeyPressed(control.START)
+						case sdl.K_z:
+							gameboy.Controller.KeyPressed(control.DEBUG)
+						}
+					} else if e.Type == sdl.KEYUP {
+						switch e.Keysym.Sym {
+						case sdl.K_RIGHT:
+							gameboy.Controller.KeyReleased(control.RIGHT)
+						case sdl.K_LEFT:
+							gameboy.Controller.KeyReleased(control.LEFT)
+						case sdl.K_UP:
+							gameboy.Controller.KeyReleased(control.UP)
+						case sdl.K_DOWN:
+							gameboy.Controller.KeyReleased(control.DOWN)
+						case sdl.K_s:
+							gameboy.Controller.KeyReleased(control.A)
+						case sdl.K_a:
+							gameboy.Controller.KeyReleased(control.B)
+						case sdl.K_SPACE:
+							gameboy.Controller.KeyReleased(control.SELECT)
+						case sdl.K_RETURN:
+							gameboy.Controller.KeyReleased(control.START)
+						case sdl.K_z:
+							gameboy.Controller.KeyPressed(control.DEBUG)
+						}
 					}
 				}
 			}
-		}
 
-		gameboy.Window.DrawFrame(gameboy.PPU.FrameBuffer)
-		frames++
-		since := time.Since(start)
-		if since > time.Second {
-			start = time.Now()
-			frames = 0
+			gameboy.Window.DrawFrame(gameboy.PPU.FrameBuffer)
+			frames++
+			since := time.Since(start)
+			if since > time.Second {
+				start = time.Now()
+				frames = 0
+			}
+
+			cyclesThisUpdate = 0
+			gameboy.CPU.IsRunning = true
 		}
 	}
 }

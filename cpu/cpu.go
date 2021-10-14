@@ -1,6 +1,7 @@
 package cpu
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -51,13 +52,15 @@ type CPU struct {
 
 	Halt         bool
 	cycleChannel chan int
+	IsRunning    bool
 }
 
 func NewCPU(mmu *mmu.MMU, cycleChannel chan int) *CPU {
 	cpu := &CPU{
 		mmu:          mmu,
 		cycleChannel: cycleChannel,
-		timer:        NewTimer(mmu),
+		IsRunning:    true,
+		timer:        NewTimer(mmu, cycleChannel),
 	}
 
 	// FF0F - IF - Interrupt Flag
@@ -67,6 +70,8 @@ func NewCPU(mmu *mmu.MMU, cycleChannel chan int) *CPU {
 	mmu.MapMemory(cpu, IE)
 
 	cpu.Reset()
+
+	go cpu.Step()
 
 	return cpu
 }
@@ -121,33 +126,24 @@ func UnimplementedInstruction(cpu *CPU) {
 	os.Exit(1)
 }
 
-func (cpu *CPU) Step() (cycles int) {
-	if !cpu.Halt {
-		initialPC := cpu.PC
-		var opcode byte = cpu.GetOpcode()
-		instruction := cpu.getInstruction(opcode)
-		cpu.CurrentInstruction = instruction
+func (cpu *CPU) Step() {
+	if cpu.IsRunning {
+		fmt.Println("test")
+		if !cpu.Halt {
+			var opcode byte = cpu.GetOpcode()
+			fmt.Printf("Opcode: %x\n", opcode)
+			instruction := cpu.getInstruction(opcode)
+			cpu.CurrentInstruction = instruction
 
-		cycles = int(instruction.Execute(cpu))
-
-		// The && opcode != 0x18 is a quick hack to stop a bug whereby in opcode 0x18 it is possible
-		// to end up with initalPC and cpu.PC being equal even when the instruction has completed
-		// successfully, and therefore adding the CurrentInstruction.Length leaves us with an incorrect
-		// cpu.PC value.
-		// TODO: Refactor CPU instructions to increment PC themselves.
-		if initialPC == cpu.PC && opcode != 0x18 && opcode != 0x20 {
-			cpu.PC += cpu.CurrentInstruction.Length
+			instruction.Execute(cpu)
+			fmt.Printf("Executed\n")
+		} else {
+			// Halt takes 1 cycle
+			cpu.cycleChannel <- 1
 		}
-	} else {
-		// Halt takes 1 cycle
-		cycles = 1
+
+		cpu.handleInterrupts()
 	}
-
-	cpu.timer.Tick(cycles)
-	cpu.handleInterrupts()
-
-	cpu.cycleChannel <- cycles * 4
-	return cycles
 }
 
 func (cpu *CPU) handleInterrupts() {

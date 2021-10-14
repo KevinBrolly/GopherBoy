@@ -25,10 +25,14 @@ type Timer struct {
 
 	dividerCounter int
 	timerCounter   int
+	cycleChannel   chan int
 }
 
-func NewTimer(mmu *mmu.MMU) *Timer {
-	timer := &Timer{mmu: mmu}
+func NewTimer(mmu *mmu.MMU, cycleChannel chan int) *Timer {
+	timer := &Timer{
+		mmu:          mmu,
+		cycleChannel: cycleChannel,
+	}
 
 	// 0xFF04 - DIV - Divider Register
 	// 0xFF05 - TIMA - Timer counter
@@ -37,6 +41,9 @@ func NewTimer(mmu *mmu.MMU) *Timer {
 	mmu.MapMemoryRange(timer, 0xFF04, 0xFF07)
 
 	timer.Reset()
+
+	go timer.Tick()
+
 	return timer
 }
 
@@ -49,44 +56,46 @@ func (timer *Timer) Reset() {
 	timer.dividerCounter = 0
 }
 
-func (timer *Timer) Tick(cycles int) {
-	timer.updateDividerRegister(cycles)
+func (timer *Timer) Tick() {
+	for cycle := range timer.cycleChannel {
+		timer.updateDividerRegister(cycle)
 
-	if utils.IsBitSet(timer.TAC, TIMER_STOP) {
+		if utils.IsBitSet(timer.TAC, TIMER_STOP) {
 
-		timer.timerCounter += cycles
+			timer.timerCounter += cycle
 
-		var threshold int
-		frequency := timer.getClockFrequency()
+			var threshold int
+			frequency := timer.getClockFrequency()
 
-		switch frequency {
-		case 0:
-			threshold = 256 // frequency 4096
-		case 1:
-			threshold = 4 // frequency 262144
-		case 2:
-			threshold = 16 // frequency 65536
-		case 3:
-			threshold = 64 // frequency 16382
-		}
+			switch frequency {
+			case 0:
+				threshold = 256 // frequency 4096
+			case 1:
+				threshold = 4 // frequency 262144
+			case 2:
+				threshold = 16 // frequency 65536
+			case 3:
+				threshold = 64 // frequency 16382
+			}
 
-		// https://github.com/fishberg/feo-boy/blob/master/src/bus/timer.rs#L56
-		// This is the source of a common timer bug and the reason blargg's instr_timing
-		// test was failing with "Failure #255".
-		//
-		// Some instructions will go over the threshold in one instruction so rather than
-		// reset the timerCounter to the current threshold we just subtract the threshold
-		// to "reset" it, this way any cycles left over will still be counted/available
-		// in timerCounter
-		for timer.timerCounter >= threshold {
-			timer.timerCounter -= threshold
+			// https://github.com/fishberg/feo-boy/blob/master/src/bus/timer.rs#L56
+			// This is the source of a common timer bug and the reason blargg's instr_timing
+			// test was failing with "Failure #255".
+			//
+			// Some instructions will go over the threshold in one instruction so rather than
+			// reset the timerCounter to the current threshold we just subtract the threshold
+			// to "reset" it, this way any cycles left over will still be counted/available
+			// in timerCounter
+			for timer.timerCounter >= threshold {
+				timer.timerCounter -= threshold
 
-			// If timer is about to overflow
-			if timer.TIMA == 255 {
-				timer.TIMA = timer.TMA
-				timer.mmu.RequestInterrupt(TIMER_OVERFLOW_INTERRUPT)
-			} else {
-				timer.TIMA = timer.TIMA + 1
+				// If timer is about to overflow
+				if timer.TIMA == 255 {
+					timer.TIMA = timer.TMA
+					timer.mmu.RequestInterrupt(TIMER_OVERFLOW_INTERRUPT)
+				} else {
+					timer.TIMA = timer.TIMA + 1
+				}
 			}
 		}
 	}

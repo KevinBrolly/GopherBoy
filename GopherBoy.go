@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	window := NewSDL2Window("Gameboy", 160, 144)
+	window := NewSDL2Window("Gameboy", 640, 576)
 
 	gameboy := gameboy.NewGameboy(window)
 
@@ -42,7 +42,12 @@ func NewSDL2Window(name string, width, height int) *SDL2Window {
 
 	var err error
 	w.window, err = sdl.CreateWindow(w.Name, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		int32(w.Width), int32(w.Height), sdl.WINDOW_SHOWN)
+		int32(w.Width), int32(w.Height), sdl.WINDOW_ALLOW_HIGHDPI)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = sdl.CreateRenderer(w.window, -1, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -56,11 +61,19 @@ func (w *SDL2Window) Quit() {
 }
 
 func (w *SDL2Window) DrawFrame(buffer *image.RGBA) {
-	surface, err := w.window.GetSurface()
+	renderer, err := w.window.GetRenderer()
 	if err != nil {
 		panic(err)
 	}
 
+	surface, err := sdl.CreateRGBSurface(0, 160, 144, 32, 0, 0, 0, 0)
 	draw.Draw(surface, surface.Bounds(), buffer, image.Point{}, draw.Src)
-	w.window.UpdateSurface()
+
+	texture,err := renderer.CreateTextureFromSurface(surface);
+	if err != nil {
+		panic(err)
+	}
+	
+	renderer.Copy(texture, nil, nil);
+	renderer.Present();
 }
